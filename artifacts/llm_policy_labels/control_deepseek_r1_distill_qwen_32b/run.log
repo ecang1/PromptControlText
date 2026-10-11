@@ -13,3 +13,10 @@
 2026-10-11 15:53:25,359 INFO: Saved labeled.csv (850 rows).
 2026-10-11 15:53:25,412 INFO: Audit sample: 323 rows.
 2026-10-11 15:53:25,421 INFO: Job control_deepseek_r1_distill_qwen_32b finished in 15s: 849/850 valid labels.
+2026-10-11 16:19:12,938 INFO: Job control_deepseek_r1_distill_qwen_32b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_deepseek_r1_distill_qwen_32b.csv
+2026-10-11 16:19:13,069 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_deepseek_r1_distill_qwen_32b.csv
+2026-10-11 16:19:13,250 INFO: Replayed 849 completed request resolutions.
+2026-10-11 16:19:13,266 INFO: 1 rows to process.
+2026-10-11 16:19:26,617 INFO: Saved labeled.csv (850 rows).
+2026-10-11 16:19:26,664 INFO: Audit sample: 322 rows.
+2026-10-11 16:19:26,667 INFO: Job control_deepseek_r1_distill_qwen_32b finished in 14s: 850/850 valid labels.
