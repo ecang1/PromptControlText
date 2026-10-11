@@ -1,0 +1,16 @@
+{
+  "job_id": "control_gemma4_31b",
+  "input": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_gemma4_31b.csv",
+  "output_dir": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/llm_policy_labels/control_gemma4_31b",
+  "model": "meta-llama--Llama-3.1-8B-Instruct",
+  "schema_version": "v1",
+  "prompt_set_version": "v1",
+  "total_rows": 850,
+  "processed_rows": 850,
+  "parse_errors": 0,
+  "valid_labeled_rows": 850,
+  "complete": true,
+  "input_sha256": "baf5493fae294aeabd3e110d3a7c00445d647fbd172bf434f75becb8dd0dc6cc",
+  "resume_identity": "row_index_and_answer_hash",
+  "elapsed_seconds": 0.4
+}

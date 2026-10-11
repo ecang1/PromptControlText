@@ -1,0 +1,15 @@
+2026-10-11 15:00:43,326 INFO: Job control_nemotron_3_nano_4b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_nemotron_3_nano_4b.csv
+2026-10-11 15:00:43,364 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_nemotron_3_nano_4b.csv
+2026-10-11 15:00:43,439 INFO: Replayed 0 completed request resolutions.
+2026-10-11 15:00:43,458 INFO: 850 rows to process.
+2026-10-11 15:04:14,168 INFO: Progress: 500 / 850 rows processed.
+2026-10-11 15:05:13,813 INFO: Saved labeled.csv (850 rows).
+2026-10-11 15:05:13,866 INFO: Audit sample: 341 rows.
+2026-10-11 15:05:13,869 INFO: Job control_nemotron_3_nano_4b finished in 271s: 850/850 valid labels.
+2026-10-11 15:52:07,693 INFO: Job control_nemotron_3_nano_4b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_nemotron_3_nano_4b.csv
+2026-10-11 15:52:07,734 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_nemotron_3_nano_4b.csv
+2026-10-11 15:52:07,938 INFO: Replayed 850 completed request resolutions.
+2026-10-11 15:52:07,957 INFO: 0 rows to process.
+2026-10-11 15:52:08,081 INFO: Saved labeled.csv (850 rows).
+2026-10-11 15:52:08,136 INFO: Audit sample: 341 rows.
+2026-10-11 15:52:08,140 INFO: Job control_nemotron_3_nano_4b finished in 0s: 850/850 valid labels.

@@ -1,0 +1,13 @@
+{
+  "job_id": "control_deepseek_r1_distill_llama_70b",
+  "model": "meta-llama--Llama-3.1-8B-Instruct",
+  "temperature": 0.0,
+  "max_tokens": 250,
+  "schema_version": "v1",
+  "prompt_sha256": {
+    "A": "b024b93f8134cf7e5962d4fa4c4630ced3d0644c5ffe601b7c19c843a3aca1f2",
+    "B": "3177ec64c028fd2dc98db752b5e4aee45b687d52b9f083a6cd630a2b52670d0a",
+    "C": "5dd37cf71e599d953802aed96468d744a21185fdabe19801e520f1b8ffa1ee0d",
+    "adjudicator": "432146bbb3cdf8160f361e78071056b775448534013498efd3833533885fb087"
+  }
+}

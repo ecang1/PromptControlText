@@ -1,0 +1,15 @@
+2026-10-11 14:56:51,368 INFO: Job control_gemma4_12b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_gemma4_12b.csv
+2026-10-11 14:56:51,397 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_gemma4_12b.csv
+2026-10-11 14:56:51,466 INFO: Replayed 0 completed request resolutions.
+2026-10-11 14:56:51,484 INFO: 850 rows to process.
+2026-10-11 14:58:46,855 INFO: Progress: 500 / 850 rows processed.
+2026-10-11 14:59:23,323 INFO: Saved labeled.csv (850 rows).
+2026-10-11 14:59:23,536 INFO: Audit sample: 252 rows.
+2026-10-11 14:59:23,538 INFO: Job control_gemma4_12b finished in 152s: 850/850 valid labels.
+2026-10-11 15:50:50,094 INFO: Job control_gemma4_12b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_gemma4_12b.csv
+2026-10-11 15:50:50,130 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_gemma4_12b.csv
+2026-10-11 15:50:50,320 INFO: Replayed 850 completed request resolutions.
+2026-10-11 15:50:50,339 INFO: 0 rows to process.
+2026-10-11 15:50:50,454 INFO: Saved labeled.csv (850 rows).
+2026-10-11 15:50:50,706 INFO: Audit sample: 252 rows.
+2026-10-11 15:50:50,710 INFO: Job control_gemma4_12b finished in 1s: 850/850 valid labels.

@@ -1,0 +1,16 @@
+{
+  "job_id": "control_deepseek_r1_distill_qwen_32b",
+  "input": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_deepseek_r1_distill_qwen_32b.csv",
+  "output_dir": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/llm_policy_labels/control_deepseek_r1_distill_qwen_32b",
+  "model": "meta-llama--Llama-3.1-8B-Instruct",
+  "schema_version": "v1",
+  "prompt_set_version": "v1",
+  "total_rows": 850,
+  "processed_rows": 850,
+  "parse_errors": 0,
+  "valid_labeled_rows": 849,
+  "complete": false,
+  "input_sha256": "d54d8227614b47af63bd02e49600ee98ebcc2040861c0b61f4267500e601af24",
+  "resume_identity": "row_index_and_answer_hash",
+  "elapsed_seconds": 15.1
+}

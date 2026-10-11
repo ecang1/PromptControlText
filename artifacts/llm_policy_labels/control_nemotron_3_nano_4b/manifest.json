@@ -1,0 +1,16 @@
+{
+  "job_id": "control_nemotron_3_nano_4b",
+  "input": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_nemotron_3_nano_4b.csv",
+  "output_dir": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/llm_policy_labels/control_nemotron_3_nano_4b",
+  "model": "meta-llama--Llama-3.1-8B-Instruct",
+  "schema_version": "v1",
+  "prompt_set_version": "v1",
+  "total_rows": 850,
+  "processed_rows": 850,
+  "parse_errors": 0,
+  "valid_labeled_rows": 850,
+  "complete": true,
+  "input_sha256": "434a1a0582530ce38aff2dd256ebf163a131eb299e563827262b048ae500d06d",
+  "resume_identity": "row_index_and_answer_hash",
+  "elapsed_seconds": 0.4
+}
