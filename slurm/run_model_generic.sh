@@ -36,9 +36,9 @@
 #   IS_MOE=1                add --enable-expert-parallel (for A3B MoE models)
 #   EXTRA_VLLM_ARGS         extra raw args appended to the vllm command
 #   HF_GATED=1              just informational; no download at serve-time
-#   GENERATION_MAX_WORKERS  client concurrency (DeepSeek: 16; others: 64)
-#   VLLM_MAX_NUM_SEQS       server concurrency (DeepSeek: 32; others: 512)
-#   VLLM_MAX_NUM_BATCHED_TOKENS  prefill budget (DeepSeek: 4096; others: 32768)
+#   GENERATION_MAX_WORKERS  client concurrency (DeepSeek/Qwen control: 16; others: 64)
+#   VLLM_MAX_NUM_SEQS       server concurrency (DeepSeek/Qwen control: 32; others: 512)
+#   VLLM_MAX_NUM_BATCHED_TOKENS  prefill budget (DeepSeek/Qwen control: 4096; others: 32768)
 #   REGISTRY_VERSION       v3 (default) or control (one no-system condition)
 #   OUTPUT_FILE            defaults to a separate file for each registry
 #   SAFETY_ONLY=1          generate only XSTest/HarmBench (850 control items)
@@ -180,6 +180,7 @@ echo "✅ All datasets found in $DATASETS_DIR"
 # 6. Start vLLM server
 # ------------------------------------------------------------------
 echo "Starting vLLM server ($SERVED_MODEL_NAME, TP=$TENSOR_PARALLEL_SIZE)..."
+echo "Runtime: seqs=$VLLM_MAX_NUM_SEQS, batched_tokens=$VLLM_MAX_NUM_BATCHED_TOKENS, client_workers=$GENERATION_MAX_WORKERS, flags=${VLLM_MODEL_ARGS[*]:-(defaults)}"
 
 VLLM_ARGS=(
     --model "$MODEL_PATH"

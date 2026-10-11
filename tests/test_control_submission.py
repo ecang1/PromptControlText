@@ -98,3 +98,50 @@ def test_control_can_explicitly_request_smoke_test(submit):
 
 def test_unknown_control_is_rejected_before_submitting_any_jobs(submit):
     assert submit("submit_new_controls.sh", "gemma4_12b", "not-a-model", success=False) == []
+
+
+def runtime_settings(slug, registry=None, **overrides):
+    env = dict(os.environ)
+    for key in ("REGISTRY_VERSION", "VLLM_MAX_NUM_SEQS",
+                "VLLM_MAX_NUM_BATCHED_TOKENS", "GENERATION_MAX_WORKERS"):
+        env.pop(key, None)
+    env["MODEL_SLUG"] = slug
+    if registry is not None:
+        env["REGISTRY_VERSION"] = registry
+    env.update(overrides)
+    result = subprocess.run(
+        ["bash", "-ec", 'source "$1"; printf "%s\\n" "$VLLM_MAX_NUM_SEQS" '
+         '"$VLLM_MAX_NUM_BATCHED_TOKENS" "$GENERATION_MAX_WORKERS" '
+         '"${VLLM_MODEL_ARGS[@]}"', "runtime", str(ROOT / "slurm/model_runtime.sh")],
+        env=env, capture_output=True, text=True, check=True,
+    )
+    lines = result.stdout.splitlines()
+    return tuple(map(int, lines[:3])), [line for line in lines[3:] if line]
+
+
+@pytest.mark.parametrize("slug,registry,conservative", [
+    ("qwen3_6_35b_a3b", "control", True),
+    ("qwen3_6_35b_a3b", "v3", False),
+    ("qwen3_6_35b_a3b", None, False),
+    ("deepseek_r1_distill_qwen_32b", "v3", True),
+    ("deepseek_r1_distill_llama_70b", "control", True),
+    ("gemma4_12b", "control", False),
+    ("nemotron_3_nano_4b", "control", False),
+])
+def test_qwen_control_cuda_mitigation_preserves_other_runtime_defaults(slug, registry, conservative):
+    limits, flags = runtime_settings(slug, registry)
+    if conservative:
+        assert limits == (32, 4096, 16)
+        assert flags == ["--enforce-eager", "--no-async-scheduling"]
+    else:
+        assert limits == (512, 32768, 64)
+        assert flags == []
+
+
+def test_qwen_control_respects_explicit_runtime_limits():
+    limits, flags = runtime_settings(
+        "qwen3_6_35b_a3b", "control", VLLM_MAX_NUM_SEQS="8",
+        VLLM_MAX_NUM_BATCHED_TOKENS="2048", GENERATION_MAX_WORKERS="4",
+    )
+    assert limits == (8, 2048, 4)
+    assert flags == ["--enforce-eager", "--no-async-scheduling"]

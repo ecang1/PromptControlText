@@ -43,7 +43,15 @@ Queue time depends on availability, particularly for the four-GPU 70B model.
 
 Gemma retains its separate environment and FlashInfer sampler workaround.
 DeepSeek retains eager execution, synchronous scheduling, and reduced
-concurrency. New control servers use job-specific ports so generation and
+concurrency. Qwen-3.6 controls now use the same conservative runtime after a
+rank-0 CUDA illegal-memory-access crash: `--enforce-eager`,
+`--no-async-scheduling`, at most 32 server sequences, 4,096 batched prefill
+tokens, and 16 client workers. This is a mitigation, not a confirmed kernel fix;
+the NCCL watchdog reported the error but may not be where it originated.
+The Qwen prompted runtime is unchanged. Eager execution can reduce throughput,
+but these controls contain only 850 items and resume completed answers without
+increasing the requested GPUs, memory, or time limit.
+New control servers use job-specific ports so generation and
 judging can share nodes without all attempting to bind port 8000. OpenMP thread
 counts follow the allocated CPUs.
 
@@ -91,6 +99,19 @@ First-pass and adjudicator calls now share schema-constrained JSON output;
 sync this fix before retrying older adjudications that repeatedly returned
 invalid field values such as `"null"` or `"safety"`. Saved results are not relabeled
 by the code update; unresolved rows require fresh judge calls.
+
+For the Qwen-3.6 CUDA crash, sync the runtime change and resubmit only Qwen:
+
+```bash
+bash slurm/submit_new_controls.sh qwen3_6_35b_a3b
+```
+
+The uploaded checkpoint has 508 of 850 answers, so that snapshot needs only
+342 more generations. The judge starts after generation succeeds. A CUDA
+illegal-memory-access error is distinct from an out-of-memory error. If the
+conservative runtime still fails, retain the full job `.out` and `.err` files;
+the first CUDA failure is needed to investigate the kernel/backend rather than
+the subsequent `Broken pipe`, `RuntimeError: cancelled`, or connection errors.
 
 ## Add completed baselines to the analysis CSV
 

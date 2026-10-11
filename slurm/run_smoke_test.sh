@@ -145,7 +145,8 @@ VLLM_ARGS=(
     --disable-custom-all-reduce
 )
 VLLM_ARGS+=("${VLLM_MODEL_ARGS[@]}")
-if [[ "$MODEL_SLUG" == deepseek_r1_distill_* ]]; then
+# Match the reduced limits whenever the shared runtime selects eager execution.
+if [ "${#VLLM_MODEL_ARGS[@]}" -gt 0 ]; then
     VLLM_ARGS+=(--max-num-seqs "$VLLM_MAX_NUM_SEQS"
                 --max-num-batched-tokens "$VLLM_MAX_NUM_BATCHED_TOKENS"
                 --enable-chunked-prefill)
