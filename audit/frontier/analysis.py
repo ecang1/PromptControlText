@@ -136,7 +136,6 @@ def analyze(manifest, bundle, a, b, adjudication=None, judges=None, frame=None, 
         durations[name]={'rated_n':len(elapsed),'median_seconds':quantile(elapsed,.5),'p90_seconds':quantile(elapsed,.9),
                          'total_active_seconds':sum(elapsed),'note':'Active visible-tab timer; interruptions/reading away from tab require manual coordinator accounting.'}
     return {'version':VERSION,'component':manifest['component'], 'status':'analysis of supplied annotations; interpret coverage before use',
-            'pass_status':{name:{'sealed':e['sealed'],'closure_reason':e.get('closure_reason')} for name,e in [('a',a),('b',b)]},
             'inputs':{'manifest':manifest['checksum'],'a':a['checksum'],'b':b['checksum'],
                       'adjudication':adjudication['checksum'] if adjudication else None,'judges':judges['checksum'] if judges else None},
             'coverage':{'assigned':len(m),'annotator_a':len(ra),'annotator_b':len(rb),'adjudicated':len(adj),

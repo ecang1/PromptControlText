@@ -114,9 +114,9 @@ def exclude(rows, manifests):
 
 
 def allocation(sizes, n):
-    """One per nonempty stratum, then proportional remaining-capacity apportionment."""
+    """One per nonempty condition, then proportional remaining-capacity apportionment."""
     if n < len(sizes) or n > sum(sizes.values()):
-        raise ValueError('Sample must cover each available stratum and fit the frame')
+        raise ValueError('Sample must cover each available condition and fit the frame')
     out = {k:1 for k in sizes}; remaining = n-len(sizes)
     capacity = sum(v-1 for v in sizes.values())
     if remaining:
@@ -127,52 +127,36 @@ def allocation(sizes, n):
     return out
 
 
-def check_practices(frame, practices):
-    frame_by_id = indexed(frame['rows'], 'request_id')
-    for practice_manifest in practices:
-        verified(practice_manifest)
-        if practice_manifest['component'] != 'practice' or practice_manifest['rubric'] != frame['rubric']:
-            raise ValueError('Expected immutable practice manifest with the same rubric')
-        indexed(practice_manifest['rows'], 'request_id')
-        for r in practice_manifest['rows']:
-            if (r['request_id'] not in frame_by_id
-                    or frame_by_id[r['request_id']]['response_sha256'] != r['response_sha256']
-                    or sha(r['response_text']) != r['response_sha256']):
-                raise ValueError('Practice does not map to this generation frame')
-
-
-def representative(frame, calibration, seed, per_provider=100, stratify='condition', prior_practice=()):
-    # Keep Python defaults compatible with the original condition-covering design.
-    # The minimal CLI explicitly defaults to 10/provider and benchmark strata.
-    verified(frame)
+def representative(frame, calibration, seed, per_provider=100):
+    verified(frame);verified(calibration)
     if not frame['complete']:
         raise ValueError('Scored sampling requires the final complete generation frame')
-    if stratify not in ('condition', 'benchmark'):
-        raise ValueError('Unknown sampling stratification')
-    check_practices(frame, [calibration, *prior_practice])
-    eligible = exclude(frame['rows'], [calibration, *prior_practice]); selected=[]; strata=[];coverage={}
-    group_key = 'condition_id' if stratify == 'condition' else 'benchmark'
-    for provider in sorted({r['provider'] for r in frame['rows']}):
+    if calibration['component'] != 'practice':
+        raise ValueError('Expected immutable practice manifest')
+    frame_by_id = indexed(frame['rows'], 'request_id')
+    for r in calibration['rows']:
+        if r['request_id'] not in frame_by_id or frame_by_id[r['request_id']]['response_sha256'] != r['response_sha256']:
+            raise ValueError('Practice does not map to this generation frame')
+    eligible = exclude(frame['rows'], [calibration]); selected=[]; strata=[];coverage={}
+    for provider in sorted({r['provider'] for r in eligible}):
         groups=defaultdict(list)
         for r in eligible:
-            if r['provider']==provider:groups[r[group_key]].append(r)
+            if r['provider']==provider:groups[r['condition_id']].append(r)
         counts=allocation({k:len(v) for k,v in groups.items()},per_provider)
-        for key, rs in sorted(groups.items()):
-            n=counts[key];N=len(rs)
-            strata.append({'provider':provider,group_key:key,'N':N,'n':n})
+        for condition, rs in sorted(groups.items()):
+            n=counts[condition];N=len(rs)
+            strata.append({'provider':provider,'condition_id':condition,'N':N,'n':n})
             for r in sorted(rs,key=lambda r:rank(seed,r['request_id']))[:n]:
                 selected.append(dict(r,inclusion_probability=n/N,weight=N/n))
         chosen=[r for r in selected if r['provider']==provider]
         coverage[provider]={'conditions':len({r['condition_id'] for r in chosen}),
-                            'benchmarks':dict(Counter(r['benchmark'] for r in chosen)),
-                            'missing_conditions':sorted({r['condition_id'] for r in eligible if r['provider']==provider}-{r['condition_id'] for r in chosen}),
                             'benchmark_strata':dict(Counter(r['stratum'] for r in chosen)),
                             'missing_benchmark_strata':sorted({r['stratum'] for r in eligible if r['provider']==provider}-{r['stratum'] for r in chosen})}
     return package(selected,'representative',seed,frame,
                    {'per_provider':per_provider,'eligible_N':len(eligible),'excluded_practice_texts':len(frame['rows'])-len(eligible),
-                    'stratify':stratify,'strata':strata,'coverage':coverage,
+                    'strata':strata,'coverage':coverage,
                     'estimand':'Text responses in the final frozen study, excluding every exact practice-text match; not all benchmark items.'},
-                   {'practice':calibration['checksum'], 'prior_practice':sorted({m['checksum'] for m in prior_practice})})
+                   {'practice':calibration['checksum']})
 
 
 def check_judges(judges, frame):
@@ -191,18 +175,14 @@ def check_judges(judges, frame):
     return rows
 
 
-def targeted(frame, calibration, representative_manifest, judges, seed, n=60, prior_practice=()):
+def targeted(frame, calibration, representative_manifest, judges, seed, n=60):
     if n<0:raise ValueError('Targeted size cannot be negative')
     j=check_judges(judges,frame);verified(representative_manifest)
     if representative_manifest['frame_checksum']!=frame['checksum'] or representative_manifest['component']!='representative':
         raise ValueError('Representative sample belongs to another frame')
     if representative_manifest['sources'].get('practice')!=calibration['checksum']:
         raise ValueError('Practice mismatch')
-    check_practices(frame, [calibration, *prior_practice])
-    prior_checksums=sorted({m['checksum'] for m in prior_practice})
-    if representative_manifest['sources'].get('prior_practice',[])!=prior_checksums:
-        raise ValueError('Prior practice exclusions mismatch')
-    eligible=exclude(frame['rows'],[calibration,*prior_practice,representative_manifest]);counts=Counter(x['primary_label'] for x in j.values() if x['primary_label'])
+    eligible=exclude(frame['rows'],[calibration,representative_manifest]);counts=Counter(x['primary_label'] for x in j.values() if x['primary_label'])
     candidates=[]
     for r in eligible:
         q=j[r['request_id']];why=[]
@@ -214,7 +194,7 @@ def targeted(frame, calibration, representative_manifest, judges, seed, n=60, pr
     for r in chosen:r.update(inclusion_probability=len(chosen)/len(candidates),weight=None)
     return package(chosen,'targeted',seed,frame,{'maximum_n':n,'candidate_N':len(candidates),'rare_threshold':.05,'confidence_threshold':.8,
                    'estimand':'Conditional diagnostic queue only; never combine with representative estimates'},
-                   {'practice':calibration['checksum'],'prior_practice':prior_checksums,'representative':representative_manifest['checksum'],'judges':judges['checksum']})
+                   {'practice':calibration['checksum'],'representative':representative_manifest['checksum'],'judges':judges['checksum']})
 
 
 def judge_input(frame, out):
@@ -270,10 +250,6 @@ def adjudication_bundle(bundle, a, b):
     rows=[]
     # Review every row, including agreement: accept the consensus explicitly or mark unresolved.
     for r in bundle['rows']:
-        # A time-limited pass is sealed with missing responses left unannotated.
-        # Adjudicate only paired ratings; analysis keeps all assigned rows in coverage.
-        if r['audit_id'] not in ra or r['audit_id'] not in rb:
-            continue
         public=lambda rating:{k:rating[k] for k in ['primary_label','confidence','uncertain','evidence','reason']}
         rows.append(dict(r,rating_a=public(ra[r['audit_id']]),rating_b=public(rb[r['audit_id']])))
     return stamp({'version':VERSION,'mode':'adjudication','rubric':bundle['rubric'],
@@ -294,9 +270,7 @@ def make_kit(bundle_path, out):
     shutil.copyfile(ROOT/'docs/frontier-audit/ANNOTATOR_GUIDE.md',p/'ANNOTATOR_GUIDE.md')
     (p/'START.txt').write_text('Read ANNOTATOR_GUIDE.md. Use your own copy of this folder.\n'
         'Run: python3 -m audit.frontier.dashboard --bundle bundle.json --database .local/ratings.sqlite --coder YOUR_PSEUDONYM\n'
-        'Run the command inside this extracted folder; keep Terminal open. Python 3.9+ is required.\n'
-        'Then open http://127.0.0.1:8765 in your browser. This address means YOUR computer, not the coordinator\'s.\n'
-        'Keep the same database and pseudonym to resume. On Windows you may use py -3 instead of python3.\n')
+        'Open http://127.0.0.1:8765. Keep the same database and pseudonym to resume.\n')
 
 
 def main():
@@ -304,15 +278,11 @@ def main():
     p=sub.add_parser('frame');p.add_argument('--run',default='artifacts/frontier/runs/2026-10-08-main');p.add_argument('--out',required=True)
     for name in ['practice','representative','targeted']:
         p=sub.add_parser(name);p.add_argument('--frame',required=True);p.add_argument('--out',required=True);p.add_argument('--seed',required=True)
-        if name=='practice':p.add_argument('--n',type=int,default=10)
-        else:
-            p.add_argument('--practice',required=True)
-            p.add_argument('--prior-practice',action='append',default=[],help='Previously distributed practice manifest; repeat to preserve all exposure exclusions')
-        if name=='representative':
-            p.add_argument('--per-provider',type=int,default=10)
-            p.add_argument('--stratify',choices=['benchmark','condition'],default='benchmark')
+        if name=='practice':p.add_argument('--n',type=int,default=30)
+        else:p.add_argument('--practice',required=True)
+        if name=='representative':p.add_argument('--per-provider',type=int,default=100)
         if name=='targeted':
-            p.add_argument('--representative',required=True);p.add_argument('--judges',required=True);p.add_argument('--n',type=int,required=True,help='Separate future protocol only; no targeted cases in the minimal audit')
+            p.add_argument('--representative',required=True);p.add_argument('--judges',required=True);p.add_argument('--n',type=int,default=60)
     p=sub.add_parser('judge-input');p.add_argument('--frame',required=True);p.add_argument('--out',required=True)
     p=sub.add_parser('import-judge');p.add_argument('--frame',required=True);p.add_argument('--directory',required=True);p.add_argument('--out',required=True)
     p=sub.add_parser('kit');p.add_argument('--bundle',required=True);p.add_argument('--out',required=True)
@@ -320,8 +290,8 @@ def main():
     args=parser.parse_args();cmd=args.command
     if cmd=='frame':immutable(args.out,build_frame(args.run))
     elif cmd=='practice':write_package(args.out,practice(read(args.frame),args.seed,args.n))
-    elif cmd=='representative':write_package(args.out,representative(read(args.frame),read(args.practice),args.seed,args.per_provider,args.stratify,[read(p) for p in args.prior_practice]))
-    elif cmd=='targeted':write_package(args.out,targeted(read(args.frame),read(args.practice),read(args.representative),read(args.judges),args.seed,args.n,[read(p) for p in args.prior_practice]))
+    elif cmd=='representative':write_package(args.out,representative(read(args.frame),read(args.practice),args.seed,args.per_provider))
+    elif cmd=='targeted':write_package(args.out,targeted(read(args.frame),read(args.practice),read(args.representative),read(args.judges),args.seed,args.n))
     elif cmd=='judge-input':judge_input(read(args.frame),args.out)
     elif cmd=='kit':make_kit(args.bundle,args.out)
     elif cmd=='import-judge':immutable(args.out,import_judge(read(args.frame),args.directory))

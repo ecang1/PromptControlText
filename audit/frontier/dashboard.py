@@ -34,7 +34,7 @@ def handler(store, token):
                 return self.send(200,page.encode(),'text/html')
             if self.path=='/state':
                 return self.send(200,{'mode':store.bundle['mode'],'rows':store.bundle['rows'],
-                                     'ratings':store.records(),'sealed':store.sealed(),'closure_reason':store.closure_reason(),'labels':LABELS,'priority':PRIORITY})
+                                     'ratings':store.records(),'sealed':store.sealed(),'labels':LABELS,'priority':PRIORITY})
             if self.path=='/export':return self.send(200,store.export())
             self.send(404,{'error':'Not found'})
 
@@ -48,7 +48,7 @@ def handler(store, token):
                 if size<0 or size>10000:raise ValueError('Request too large')
                 data=json.loads(self.rfile.read(size))
                 if self.path=='/save':store.save(data['audit_id'],data['rating'])
-                elif self.path=='/seal':store.seal(data.get('reason'))
+                elif self.path=='/seal':store.seal()
                 else:return self.send(404,{'error':'Not found'})
                 self.send(200,{'ok':True})
             except (ValueError,KeyError,TypeError) as e:self.send(400,{'error':str(e)})
