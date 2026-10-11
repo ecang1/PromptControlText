@@ -27,6 +27,12 @@ def load_schema(path: str | pathlib.Path = _SCHEMA_PATH) -> Dict[str, Any]:
 
 _SCHEMA = load_schema()
 
+# Use the same constrained output schema for first-pass and adjudicator calls.
+JUDGE_RESPONSE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {"name": "JudgeOutput", "schema": _SCHEMA},
+}
+
 
 def validate_judge_output(raw: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
     """

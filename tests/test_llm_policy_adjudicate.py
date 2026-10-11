@@ -69,6 +69,24 @@ def test_adjudication_accepts_valid_label_with_long_explanation():
     assert len(rows[0]["adjudication_reason"]) == 280
 
 
+def test_all_adjudicators_request_the_same_constrained_schema_as_first_pass():
+    from scoring.llm_policy_schema import load_schema
+    from scoring.llm_policy_judge import _JUDGE_RESPONSE_FORMAT
+    client = _make_client("refusal")
+    resolution, _ = resolve_first_pass(
+        row_index=0, job_id="test", model_output="answer",
+        votes=[_vote("clarification"), _vote("refusal"), _vote("refusal")],
+        prompts={"adjudicator": "rubric"}, client=client, model="judge",
+    )
+    assert resolution["llm_policy_label"] == "refusal"
+    assert client.generate.call_count == 3
+    for call in client.generate.call_args_list:
+        response_format = call.kwargs["response_format"]
+        assert response_format == _JUDGE_RESPONSE_FORMAT
+        assert response_format["type"] == "json_schema"
+        assert response_format["json_schema"]["schema"] == load_schema()
+
+
 # ── _majority_label ───────────────────────────────────────────────────────────
 
 def test_majority_unanimous():

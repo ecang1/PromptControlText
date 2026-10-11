@@ -12,7 +12,7 @@ from collections import Counter
 from typing import Dict, List, Optional, Tuple
 
 from models.vllm_client import ServerUnavailableError
-from scoring.llm_policy_schema import validate_judge_output, is_high_confidence
+from scoring.llm_policy_schema import validate_judge_output, is_high_confidence, JUDGE_RESPONSE_FORMAT
 from scoring.llm_policy_prompts import build_adjudicator_user_message
 
 logger = logging.getLogger(__name__)
@@ -123,6 +123,7 @@ def adjudicate_row(
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                response_format=JUDGE_RESPONSE_FORMAT,
             )
             record, err = validate_judge_output(raw)
         except ServerUnavailableError:

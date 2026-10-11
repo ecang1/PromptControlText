@@ -82,6 +82,16 @@ sbatch --array=0 --time=00:30:00 --cpus-per-task=4 \
 The judge validates that all 850 responses are present, unique, and nonempty
 before starting its GPU server. It fails if any final policy label is unresolved.
 
+If compilation reports missing Qwen-3.6 judgments, check its raw CSV first:
+an incomplete generation checkpoint must be resumed with
+`bash slurm/submit_new_controls.sh qwen3_6_35b_a3b` before judging can start.
+For complete generation with unresolved DeepSeek labels, retry only judge
+indices `4-5` using the command above. Resume preserves valid labels.
+First-pass and adjudicator calls now share schema-constrained JSON output;
+sync this fix before retrying older adjudications that repeatedly returned
+invalid field values such as `"null"` or `"safety"`. Saved results are not relabeled
+by the code update; unresolved rows require fresh judge calls.
+
 ## Add completed baselines to the analysis CSV
 
 After all six judges finish, and wherever the saved labeled outputs are present:

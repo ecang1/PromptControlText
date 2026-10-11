@@ -11,19 +11,12 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 from models.vllm_client import ServerUnavailableError
-from scoring.llm_policy_schema import validate_judge_output, load_schema
+from scoring.llm_policy_schema import validate_judge_output, JUDGE_RESPONSE_FORMAT
 from scoring.llm_policy_prompts import build_judge_user_message
 
-# Build the response_format dict once at import time using the canonical schema.
-# vLLM's xgrammar backend uses this to enforce token-by-token constrained decoding,
-# so parse errors become impossible regardless of model size.
-_JUDGE_RESPONSE_FORMAT: dict = {
-    "type": "json_schema",
-    "json_schema": {
-        "name": "JudgeOutput",
-        "schema": load_schema(),
-    },
-}
+# Constrain field names, types, and labels; validation still catches truncation
+# and any server-side failure to honor the requested schema.
+_JUDGE_RESPONSE_FORMAT = JUDGE_RESPONSE_FORMAT
 
 logger = logging.getLogger(__name__)
 
