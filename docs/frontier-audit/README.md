@@ -1,18 +1,16 @@
 # Human-validation preparation
 
-The current reduced-workload plan is **10 practice responses, 30 representative responses (10/provider), and no targeted packet**. The total time cap is three hours per annotator. Stop at the cap and use **Close at time limit** to preserve a sealed partial pass with missing responses. Both annotators independently label the same full packet. This is a small exploratory check, not strong evidence of judge reliability. These are workload defaults, not a power calculation; time practice and record the final scored size before drawing the sample.
+Start with [ANNOTATOR_GUIDE.md](ANNOTATOR_GUIDE.md) for the criteria and [COORDINATOR.md](COORDINATOR.md) for the full workflow and commands. [REPORT_TEMPLATE.md](REPORT_TEMPLATE.md) is intentionally unfilled; [VALIDATION.md](VALIDATION.md) records software checks.
 
-Read [ANNOTATOR_GUIDE.md](ANNOTATOR_GUIDE.md) for unchanged six-policy criteria, [COORDINATOR.md](COORDINATOR.md) for commands, and [ANNOTATOR_INSTRUCTIONS.md](ANNOTATOR_INSTRUCTIONS.md) for step-by-step annotation instructions. [MINIMAL_AUDIT_VALIDATION.md](MINIMAL_AUDIT_VALIDATION.md) records validation of this revision; [VALIDATION.md](VALIDATION.md) preserves the original preparation evidence. [REPORT_TEMPLATE.md](REPORT_TEMPLATE.md) has no study findings filled in.
+The separate `audit.frontier` dashboard uses the six canonical policies, response-only case display, independent insert-only first passes, separate sealed-source adjudication, confidence, evidence and a review flag. Historical audit files and the canonical judge remain unchanged.
 
-The new private kit is `.local/frontier-audit/practice-kit-minimal-v1.zip`. Give each annotator a clean copy. The old 30-response kit and any ratings remain untouched. All previously distributed practice responses and exact text matches remain excluded from evaluation. Runtime kits, mappings, identities and notes stay private.
-
-Inside the extracted kit folder, with Python 3.9+:
+A provisional 30-response practice packet was prepared locally from the verified partial generation archive. It contains **no human ratings**. Coordinator-private runtime artifacts belong under `.local/frontier-audit/`; they are not published with this code. The prepared shareable folder/archive is `practice-kit-v1` / `practice-kit-v1.zip` in that directory. Give each annotator their own copy, choose pseudonyms, and run inside each kit:
 
 ```sh
 python3 -m audit.frontier.dashboard --bundle bundle.json \
   --database .local/ratings.sqlite --coder rater_a --port 8765
 ```
 
-Use `rater_b` in the second annotator's own copy. Keep Terminal open and visit `http://127.0.0.1:8765` in the browser on that same computer. This address means the annotator's computer, not the coordinator's. Windows users may replace `python3` with `py -3`. Relaunch with the same database and pseudonym to resume. Saved ratings are permanent; adjudication is separate.
+Use `rater_b` in the second annotator's separate copy. Open `http://127.0.0.1:8765`. The server stays local, uses Python's standard library and does not launch inference. Stop it with Ctrl-C. Read the guide before practice. Independent human ratings have not been created; the synthetic test fixtures are software tests only.
 
-The benchmark-stratified lighter sampler replaces the requirement to cover every condition per provider. It records coverage gaps and inclusion weights. The original condition-stratified design remains explicitly selectable. The 10,950-case generation archive, canonical judge/rubric, and legacy audit behavior are unchanged. Human collection, frontier judging and final sample freezing are separate tasks. The scheduler stays paused.
+The final representative audit size awaits practice timing and coordinator decisions. The representative sampling command requires the complete final generation frame. The targeted queue additionally awaits actual canonical judge outputs. The scheduled heartbeat remains paused; this preparation does not restart it.
