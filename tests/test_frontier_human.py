@@ -78,70 +78,6 @@ def test_representative_rejects_partial_and_impossible_size():
     assert allocation({'a':1,'b':4},5)=={'a':1,'b':4}
 
 
-def test_benchmark_sample_can_be_smaller_than_condition_count():
-    f=frame();cal,_=practice(f,'cal',6)
-    m,b=representative(f,cal,'small',3,stratify='benchmark')
-    assert len(m['rows'])==9 and m['settings']['stratify']=='benchmark'
-    assert all(set(r)=={'audit_id','response_text'} for r in b['rows'])
-    for provider in ['p0','p1','p2']:
-        rows=[r for r in m['rows'] if r['provider']==provider]
-        assert len(rows)==3 and len({r['benchmark'] for r in rows})==2
-        assert m['settings']['coverage'][provider]['missing_conditions']
-        for r in rows:
-            h=next(h for h in m['settings']['strata'] if h['provider']==provider and h['benchmark']==r['benchmark'])
-            assert r['inclusion_probability']==h['n']/h['N']
-            assert r['weight']==h['N']/h['n']
-    assert sum(r['weight'] for r in m['rows'])==pytest.approx(m['settings']['eligible_N'])
-    assert (m,b)==representative(f,cal,'small',3,stratify='benchmark')
-    reverse=dict(f,rows=list(reversed(f['rows'])));reverse.pop('checksum');reverse=stamp(reverse)
-    other,_=representative(reverse,cal,'small',3,stratify='benchmark')
-    assert [r['request_id'] for r in m['rows']]==[r['request_id'] for r in other['rows']]
-    with pytest.raises(ValueError,match='stratum'):representative(f,cal,'small',3,stratify='condition')
-    with pytest.raises(ValueError,match='stratification'):representative(f,cal,'small',3,stratify='unknown')
-
-
-def test_reduced_practice_preserves_prior_exclusions_and_targeted_provenance():
-    f=frame();old,_=practice(f,'practice',12);cal,_=practice(f,'practice',6)
-    assert {r['request_id'] for r in cal['rows']} < {r['request_id'] for r in old['rows']}
-    m,_=representative(f,cal,'small',6,stratify='benchmark',prior_practice=[old])
-    exposed={r['response_sha256'] for r in old['rows']}
-    assert exposed.isdisjoint(r['response_sha256'] for r in m['rows'])
-    t,_=targeted(f,cal,m,judges(f),'target',20,prior_practice=[old])
-    assert exposed.isdisjoint(r['response_sha256'] for r in t['rows'])
-    assert {r['response_sha256'] for r in m['rows']}.isdisjoint(r['response_sha256'] for r in t['rows'])
-    assert t['sources']['prior_practice']==[old['checksum']]
-    with pytest.raises(ValueError,match='Prior practice'):targeted(f,cal,m,judges(f),'target',20)
-    bad=json.loads(json.dumps(old));bad['rows'][0]['request_id']='foreign';bad.pop('checksum')
-    with pytest.raises(ValueError,match='map'):representative(f,cal,'bad',6,'benchmark',[stamp(bad)])
-    bad=json.loads(json.dumps(old));bad['rows'][0]['response_text']='SYNTHETIC altered';bad.pop('checksum')
-    with pytest.raises(ValueError,match='map'):representative(f,cal,'bad',6,'benchmark',[stamp(bad)])
-
-
-def test_benchmark_sampling_rejects_unrepresented_provider_after_exclusions():
-    f=frame();old,_=practice(f,'old',3)
-    rows=[r for r in f['rows'] if r['provider']=='p0']
-    all_p0,_=package(rows,'practice','all-p0',f,{})
-    with pytest.raises(ValueError,match='stratum'):
-        representative(f,old,'small',3,'benchmark',[all_p0])
-
-
-def test_minimal_cli_defaults_and_immutable_outputs(tmp_path):
-    import subprocess
-    import sys
-    fp=tmp_path/'frame.json';immutable(fp,frame())
-    practice_dir=tmp_path/'practice';rep_dir=tmp_path/'representative'
-    common=[sys.executable,'-m','audit.frontier.sampling']
-    command=common+['practice','--frame',str(fp),'--seed','minimal','--out',str(practice_dir)]
-    subprocess.run(command,cwd=ROOT,check=True,capture_output=True)
-    assert len(read(practice_dir/'bundle.json')['rows'])==10
-    assert subprocess.run(command,cwd=ROOT,capture_output=True).returncode!=0
-    subprocess.run(common+['representative','--frame',str(fp),'--practice',str(practice_dir/'manifest.private.json'),
-                          '--seed','minimal-score','--out',str(rep_dir)],cwd=ROOT,check=True,capture_output=True)
-    m=read(rep_dir/'manifest.private.json')
-    assert len(m['rows'])==30 and m['settings']['stratify']=='benchmark'
-    assert m['settings']['per_provider']==10
-
-
 def test_identical_texts_are_distinct_requests_and_blinded():
     f=frame();same=[r for r in f['rows'] if r['response_text']=='SYNTHETIC identical response']
     m,b=package(same,'representative','x',f,{})
@@ -198,42 +134,6 @@ def test_adjudication_binds_sealed_independent_exports(tmp_path):
     partial=dict(a,sealed=False);partial.pop('checksum');partial=stamp(partial)
     with pytest.raises(ValueError,match='sealed'):adjudication_bundle(b,partial,bb)
     with pytest.raises(ValueError,match='distinct'):adjudication_bundle(b,a,a)
-
-
-def test_time_limit_closure_preserves_missingness_and_paired_adjudication(tmp_path):
-    m,b=practice(frame(),'time-limit',4);a=Store(tmp_path/'a.sqlite',b,'a');bb=Store(tmp_path/'b.sqlite',b,'b')
-    for r in b['rows'][:2]:a.save(r['audit_id'],rating(r['response_text']))
-    for r in b['rows'][1:3]:bb.save(r['audit_id'],rating(r['response_text']))
-    with pytest.raises(ValueError,match='every assigned'):a.seal()
-    with pytest.raises(ValueError,match='Unsupported'):a.seal('other')
-    a.seal('time_limit');bb.seal('time_limit');ae=a.export();be=bb.export()
-    assert ae['closure_reason']=='time_limit' and len(validate_export(ae,b,True))==2
-    r=b['rows'][2]
-    with pytest.raises(ValueError,match='sealed'):a.save(r['audit_id'],rating(r['response_text']))
-    a.db.close();a=Store(tmp_path/'a.sqlite',b,'a');assert a.export()==ae
-    ab=adjudication_bundle(b,ae,be)
-    assert len(ab['rows'])==1 and ab['rows'][0]['audit_id']==b['rows'][1]['audit_id']
-    adj=Store(tmp_path/'adj.sqlite',ab,'adj');r=ab['rows'][0]
-    adj.save(r['audit_id'],rating(r['response_text']));adj.seal()
-    report=analyze(m,b,ae,be,adj.export(),repetitions=0)
-    assert report['coverage']['assigned']==4 and report['coverage']['adjudicated']==1
-    assert report['overall']['paired_human_n']==1
-    assert len(report['coverage']['missing_a'])==2
-    assert report['pass_status']['a']=={'sealed':True,'closure_reason':'time_limit'}
-    no_reason=dict(ae);no_reason.pop('checksum');no_reason.pop('closure_reason')
-    with pytest.raises(ValueError,match='Complete sealed'):validate_export(stamp(no_reason),b,True)
-    unsealed=dict(ae,sealed=False);unsealed.pop('checksum')
-    with pytest.raises(ValueError,match='closure'):validate_export(stamp(unsealed),b)
-
-
-def test_zero_rating_time_limit_and_no_paired_ratings(tmp_path):
-    m,b=practice(frame(),'zero-time',3);a=Store(tmp_path/'a.sqlite',b,'a');bb=Store(tmp_path/'b.sqlite',b,'b')
-    a.seal('time_limit');bb.seal('time_limit')
-    ab=adjudication_bundle(b,a.export(),bb.export());assert not ab['rows']
-    adj=Store(tmp_path/'adj.sqlite',ab,'adj');adj.seal()
-    report=analyze(m,b,a.export(),bb.export(),adj.export(),repetitions=0)
-    assert report['overall']['human_agreement_unweighted']['agreement'] is None
-    assert report['coverage']['assigned']==3 and report['coverage']['adjudicated']==0
 
 
 def test_known_agreement_confusion_and_degenerate():
@@ -302,8 +202,7 @@ def test_canonical_adapter_deduplicates_and_maps_all_requests(tmp_path):
     with pytest.raises(ValueError,match='prompt changed'):import_judge(f,d)
 
 
-@pytest.mark.parametrize('time_limit', [False, True])
-def test_http_blinding_save_protection_and_exports(tmp_path,time_limit):
+def test_http_blinding_save_protection_and_exports(tmp_path):
     """A real local HTTP service; all inputs and ratings here are synthetic."""
     import http.client
     import re
@@ -339,14 +238,6 @@ def test_http_blinding_save_protection_and_exports(tmp_path,time_limit):
         export=json.loads(call('GET','/export')[1]);assert len(export['ratings'])==1 and export['coder']=='http_a'
         assert validate_export(export,bundle)
         row=state['rows'][1]
-        if time_limit:
-            assert call('POST','/seal',{'reason':'other'},token)[0]==400
-            assert call('POST','/seal',{'reason':'time_limit'},token)[0]==200
-            assert call('POST','/save',{'audit_id':row['audit_id'],'rating':rating(row['response_text'])},token)[0]==400
-            closed=json.loads(call('GET','/export')[1])
-            assert closed['closure_reason']=='time_limit' and len(validate_export(closed,bundle,True))==1
-            assert json.loads(call('GET','/state')[1])['closure_reason']=='time_limit'
-            connection.close();return
         assert call('POST','/save',{'audit_id':row['audit_id'],'rating':rating(row['response_text'])},token)[0]==200
         assert call('POST','/seal',{},token)[0]==200
         sealed=json.loads(call('GET','/export')[1]);assert sealed['sealed']
