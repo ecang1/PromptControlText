@@ -1,0 +1,8 @@
+2026-10-11 16:59:56,057 INFO: Job control_qwen3_6_35b_a3b started.  Input: /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_qwen3_6_35b_a3b.csv
+2026-10-11 16:59:56,085 INFO: Loaded 850 rows from /scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_qwen3_6_35b_a3b.csv
+2026-10-11 16:59:56,156 INFO: Replayed 0 completed request resolutions.
+2026-10-11 16:59:56,173 INFO: 850 rows to process.
+2026-10-11 17:02:19,609 INFO: Progress: 500 / 850 rows processed.
+2026-10-11 17:03:12,507 INFO: Saved labeled.csv (850 rows).
+2026-10-11 17:03:12,609 INFO: Audit sample: 326 rows.
+2026-10-11 17:03:12,612 INFO: Job control_qwen3_6_35b_a3b finished in 197s: 850/850 valid labels.

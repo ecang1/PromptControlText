@@ -1,0 +1,16 @@
+{
+  "job_id": "control_qwen3_6_35b_a3b",
+  "input": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/phase1_results_control_qwen3_6_35b_a3b.csv",
+  "output_dir": "/scratch/gpfs/JORDANAT/mg9965/PromptControlText/artifacts/llm_policy_labels/control_qwen3_6_35b_a3b",
+  "model": "meta-llama--Llama-3.1-8B-Instruct",
+  "schema_version": "v1",
+  "prompt_set_version": "v1",
+  "total_rows": 850,
+  "processed_rows": 850,
+  "parse_errors": 0,
+  "valid_labeled_rows": 850,
+  "complete": true,
+  "input_sha256": "4cee83b0a0bd5cb9bba067f63a1413766bcc89cf132e069868f1ec0e99180c15",
+  "resume_identity": "row_index_and_answer_hash",
+  "elapsed_seconds": 196.6
+}
