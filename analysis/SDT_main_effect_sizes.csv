@@ -1,0 +1,5 @@
+outcome,effect,df1,df2,F,p,partial_eta2,manipulation,measure
+d_prime,prompt_family_short,7,290,3.6149682540062753,9.423085133298539e-4,0.08025497728377909,Prompt family,Discriminability (d')
+d_prime,clarity_level,2,290,2.0061204411146,0.1363719123366371,0.01364650964935967,Prompt clarity,Discriminability (d')
+criterion,prompt_family_short,7,290,16.605235639942308,2.136154375943081e-18,0.28613038638561905,Prompt family,Response criterion (c)
+criterion,clarity_level,2,290,33.67125315151886,7.086490760308282e-14,0.18845366872176453,Prompt clarity,Response criterion (c)

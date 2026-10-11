@@ -14,11 +14,14 @@ library(emmeans)
 library(broom.mixed)
 library(scales)
 library(patchwork)
+# Sys.setenv(PROMPT_CONTROL_RESULTS = normalizePath(
+#   "artifacts/phase1_results_combined_labeled_heuristic_v2.csv"
+# ))
 
 data_candidates <- c(
   Sys.getenv("PROMPT_CONTROL_RESULTS", unset = ""),
-  "artifacts/phase1_results_combined_labeled.csv",
-  "../artifacts/phase1_results_combined_labeled.csv"
+  "artifacts/phase1_results_combined_labeled_heuristic_v2.csv",
+  "../artifacts/phase1_results_combined_labeled_heuristic_v2.csv"
 )
 data_candidates <- data_candidates[nzchar(data_candidates) & file.exists(data_candidates)]
 if (length(data_candidates) == 0) {
@@ -29,14 +32,25 @@ loader_candidates <- c("analysis/load_combined_results.R", "load_combined_result
 loader_candidates <- loader_candidates[file.exists(loader_candidates)]
 if (!length(loader_candidates)) stop("Could not find load_combined_results.R.")
 source(loader_candidates[[1]])
-all_data <- load_combined_results(data_path, study = "all")
-analysis_data <- select_analysis_results(all_data)
+all_data <- load_combined_results(data_path)
 ```
 
 ```{r, echo=FALSE}
 
-model_lookup <- c(
-  "f2826a00ceef68f0f2b946d945ecc0477ce4450c" = "Qwen2-7B"
+model_levels <- c(
+  "Llama-3.1-8B",
+  "Llama-3.3-70B",
+  "Qwen-2-7B",
+  "Qwen-2.5-72B",
+  "Gemma-4-12B",
+  "Gemma-4-31B",
+  "Qwen-3.6-35B-A3B",
+  "Nemotron-3-Nano-4B",
+  "DeepSeek-R1-Distill-Qwen-32B",
+  "DeepSeek-R1-Distill-Llama-70B",
+  "GPT-6-Astra",
+  "Claude-Opus-5.5",
+  "Gemini-3.1-Pro"
 )
 
 # ------------------------------------------------------------
@@ -95,127 +109,147 @@ policy_levels <- c(
   "safe_redirection"
 )
 
-df <- analysis_data %>%
+df <- all_data %>%
   mutate(
-    across(all_of(score_cols), ~ suppressWarnings(as.numeric(.x))),
+  # --------------------------------------------------------
+  # Clean model names
+  # --------------------------------------------------------
+  model_name_raw = na_if(str_trim(as.character(model_name)), ""),
 
-# --------------------------------------------------------
-# Clean model names
-# --------------------------------------------------------
+  # Normalize punctuation so model IDs and display names match consistently.
+  model_name_clean = str_remove_all(
+    str_to_lower(model_name_raw), "[^a-z0-9]"
+  ),
 
-model_name_raw = as.character(model_name),
-model_name_raw = na_if(model_name_raw, ""),
-model_name_clean = str_to_lower(model_name_raw),
+  model_name = case_when(
+    # Recover the known legacy run; don't assign every missing name to Qwen.
+    is.na(model_name_raw) & source_run == "phase1_qwen25_72b" ~
+      "Qwen-2.5-72B",
 
-model_name = case_when(
-  # Main Qwen-2.5-72B run has missing model_name
-  is.na(model_name_raw) ~ "Qwen-2.5-72B",
+    model_name_clean == "f2826a00ceef68f0f2b946d945ecc0477ce4450c" ~
+      "Qwen-2-7B",
 
-  # Qwen-2-7B hash
-  model_name_raw == "f2826a00ceef68f0f2b946d945ecc0477ce4450c" ~ "Qwen-2-7B",
+    # Identify distilled models before their underlying model families.
+    str_detect(model_name_clean, "deepseek.*distill.*qwen.*32b") ~
+      "DeepSeek-R1-Distill-Qwen-32B",
+    str_detect(model_name_clean, "deepseek.*distill.*llama.*70b") ~
+      "DeepSeek-R1-Distill-Llama-70B",
 
-  # Llama models
-  str_detect(model_name_clean, "llama[-_\\.]*3\\.1[-_\\.]*8b") ~ "Llama-3.1-8B",
-  str_detect(model_name_clean, "llama[-_\\.]*3\\.3[-_\\.]*70b") ~ "Llama-3.3-70B",
+    str_detect(model_name_clean, "llama318b") ~ "Llama-3.1-8B",
+    str_detect(model_name_clean, "llama3370b") ~ "Llama-3.3-70B",
+    str_detect(model_name_clean, "qwen2572b") ~ "Qwen-2.5-72B",
+    str_detect(model_name_clean, "qwen27b") ~ "Qwen-2-7B",
 
-  # Qwen models
-  str_detect(model_name_clean, "qwen[-_\\.]*2[-_\\.]*5[-_\\.]*72b") ~ "Qwen-2.5-72B",
-  str_detect(model_name_clean, "qwen[-_\\.]*2[-_\\.]*7b") ~ "Qwen-2-7B",
+    str_detect(model_name_clean, "gemma412b") ~ "Gemma-4-12B",
+    str_detect(model_name_clean, "gemma431b") ~ "Gemma-4-31B",
+    str_detect(model_name_clean, "qwen3635ba3b") ~ "Qwen-3.6-35B-A3B",
+    str_detect(model_name_clean, "nemotron3nano4b") ~ "Nemotron-3-Nano-4B",
 
-  TRUE ~ model_name_raw
-),
+    str_detect(model_name_clean, "gpt6astra") ~ "GPT-6-Astra",
+    str_detect(model_name_clean, "claudeopus55") ~ "Claude-Opus-5.5",
+    str_detect(model_name_clean, "gemini31pro") ~ "Gemini-3.1-Pro",
 
-    # --------------------------------------------------------
-    # Clean prompt family names
-    # --------------------------------------------------------
-    prompt_family = as.character(prompt_family),
-    prompt_family = if_else(
-      is.na(prompt_family) | prompt_family == "",
-      "No-system-prompt",
-      prompt_family
-    ),
-    prompt_family = str_replace_all(prompt_family, "_", "-"),
-    prompt_family = str_replace_all(prompt_family, "\\s+", "-"),
+    TRUE ~ model_name_raw
+  ),
 
-    # Short prompt-family labels for plotting
-    prompt_family_short = case_when(
-      prompt_family == "No-system-prompt" ~ "No Prompt",
-      prompt_family == "Answer-first" ~ "Answer",
-      prompt_family == "Clarify-first" ~ "Clarify",
-      prompt_family == "Evidence-first" ~ "Evidence",
-      prompt_family == "Hierarchy-first" ~ "Hierarchy",
-      prompt_family == "Minimal-safe-help" ~ "Safe Help",
-      prompt_family == "Refuse-first" ~ "Refuse",
-      prompt_family == "Source-isolation-first" ~ "Source",
-      prompt_family == "Transform-classify-first" ~ "Transform",
-      TRUE ~ prompt_family
-    ),
+  # --------------------------------------------------------
+  # Clean prompt family names
+  # --------------------------------------------------------
+  prompt_family = as.character(prompt_family),
+  prompt_family = if_else(
+    is.na(prompt_family) | prompt_family == "",
+    "No-system-prompt",
+    prompt_family
+  ),
+  prompt_family = str_replace_all(prompt_family, "_", "-"),
+  prompt_family = str_replace_all(prompt_family, "\\s+", "-"),
 
-    # --------------------------------------------------------
-    # Clean clarity names
-    # --------------------------------------------------------
-    clarity_level = as.character(clarity_level),
-    clarity_level = if_else(
-      is.na(clarity_level) | clarity_level == "",
-      "none",
-      clarity_level
-    ),
-    clarity_level = str_replace_all(clarity_level, "_", "-"),
-    clarity_level = str_to_lower(clarity_level),
-# --------------------------------------------------------
-# Clean clarity names
-# --------------------------------------------------------
-clarity_level = as.character(clarity_level),
-clarity_level = if_else(
-  is.na(clarity_level) | clarity_level == "",
-  "none",
-  clarity_level
-),
-clarity_level = str_replace_all(clarity_level, "_", "-"),
-clarity_level = str_to_lower(clarity_level),
+  # Short prompt-family labels for plotting
+  prompt_family_short = case_when(
+    prompt_family == "No-system-prompt" ~ "No Prompt",
+    prompt_family == "Answer-first" ~ "Answer",
+    prompt_family == "Clarify-first" ~ "Clarify",
+    prompt_family == "Evidence-first" ~ "Evidence",
+    prompt_family == "Hierarchy-first" ~ "Hierarchy",
+    prompt_family == "Minimal-safe-help" ~ "Safe Help",
+    prompt_family == "Refuse-first" ~ "Refuse",
+    prompt_family == "Source-isolation-first" ~ "Source",
+    prompt_family == "Transform-classify-first" ~ "Transform",
+    TRUE ~ prompt_family
+  ),
 
-# Short display labels for plotting
-clarity_short = case_when(
-  clarity_level == "none" ~ "None",
-  clarity_level == "explicit" ~ "Explicit",
-  clarity_level == "explicit-fallback" ~ "Fallback",
-  clarity_level == "vague" ~ "Vague",
-  TRUE ~ clarity_level),
+  # --------------------------------------------------------
+  # Clean clarity names
+  # --------------------------------------------------------
+  clarity_level = as.character(clarity_level),
+  clarity_level = if_else(
+    is.na(clarity_level) | clarity_level == "",
+    "none",
+    clarity_level
+  ),
+  clarity_level = str_replace_all(clarity_level, "_", "-"),
+  clarity_level = str_to_lower(clarity_level),
 
-    # Safer than item_id if item_id changes across prompt variants
-    item_key = factor(paste(benchmark, input_text, sep = " :: ")),
+  # --------------------------------------------------------
+  # Clean clarity names (duplicate from original)
+  # --------------------------------------------------------
+  clarity_level = as.character(clarity_level),
+  clarity_level = if_else(
+    is.na(clarity_level) | clarity_level == "",
+    "none",
+    clarity_level
+  ),
+  clarity_level = str_replace_all(clarity_level, "_", "-"),
+  clarity_level = str_to_lower(clarity_level),
 
-    item_safety = case_when(
-      gold_label == "safe" ~ "safe",
-      gold_label == "unsafe" ~ "unsafe",
-      TRUE ~ NA_character_
-    ),
+  # Short display labels for plotting
+  clarity_short = case_when(
+    clarity_level == "none" ~ "None",
+    clarity_level == "explicit" ~ "Explicit",
+    clarity_level == "explicit-fallback" ~ "Fallback",
+    clarity_level == "vague" ~ "Vague",
+    TRUE ~ clarity_level
+  ),
 
-    malformed = !is.na(malformed_output)
-  ) %>%
+  # Safer than item_id if item_id changes across prompt variants
+  item_key = factor(paste(benchmark, input_text, sep = " :: ")),
+
+  item_safety = case_when(
+    gold_label == "safe" ~ "safe",
+    gold_label == "unsafe" ~ "unsafe",
+    TRUE ~ NA_character_
+  ),
+
+  malformed = !is.na(malformed_output)
+) %>%
   mutate(
     prompt_family = factor(
       prompt_family,
       levels = union(family_levels, unique(prompt_family))
     ),
+
     prompt_family_short = factor(
       prompt_family_short,
       levels = union(family_short_levels, unique(prompt_family_short))
     ),
-    clarity_level = factor(
-  clarity_level,
-  levels = c("none", "vague", "explicit", "explicit-fallback")
-),
 
-clarity_short = factor(
-  clarity_short,
-  levels = c("None", "Vague", "Explicit", "Fallback")
-),
+    clarity_level = factor(
+      clarity_level,
+      levels = c("none", "vague", "explicit", "explicit-fallback")
+    ),
+
+    clarity_short = factor(
+      clarity_short,
+      levels = c("None", "Vague", "Explicit", "Fallback")
+    ),
+
     model_name = factor(
       model_name,
-      levels = union(c("Llama-3.1-8B", "Llama-3.3-70B", "Qwen-2-7B", "Qwen-2.5-72B"), unique(model_name))
+      levels = union(model_levels, unique(na.omit(model_name)))
     )
   )
+    
+  
 
 # ------------------------------------------------------------
 # 3. Derive policy label if missing
@@ -318,6 +352,7 @@ boundary_rates
 
 
 ```
+
 ```{r, echo=FALSE}
 # ============================================================
 # PLOT 1: Safety boundary
@@ -857,7 +892,7 @@ p_policy_clarity
 # 0. Load and clean
 # ------------------------------------------------------------
 
-df <- analysis_data %>%
+df <- all_data %>%
   mutate(
     prompt_family = if_else(
       is.na(prompt_family) | prompt_family == "",
@@ -2109,5 +2144,1022 @@ frontier_model_only <- lm(
 )
 
 anova(frontier_model_only, frontier_policy_lm)
+```
+
+```{r, echo=FALSE}
+# ============================================================
+# SIGNAL DETECTION ANALYSIS
+#
+# Signal         = unsafe request
+# Positive call  = refusal
+#
+# Hit            = refuse unsafe request
+# False alarm    = refuse safe request
+#
+# d'             = sensitivity / discrimination
+# criterion (c)  = response bias
+# ============================================================
+
+library(tidyverse)
+library(car)
+library(emmeans)
+library(scales)
+library(grid)
+
+
+# ============================================================
+# 1. CONDITION-LEVEL SDT MEASURES
+# One observation = model x prompt family x clarity
+# ============================================================
+
+sdt_df <- analysis_df %>%
+  filter(
+    item_safety %in% c("safe", "unsafe"),
+    !is.na(refusal_score)
+  ) %>%
+  mutate(
+    signal  = item_safety == "unsafe",
+    refused = refusal_score == 1
+  ) %>%
+  group_by(
+    model_name,
+    prompt_family_short,
+    clarity_level
+  ) %>%
+  summarise(
+    hits               = sum(signal & refused),
+    misses             = sum(signal & !refused),
+    false_alarms       = sum(!signal & refused),
+    correct_rejections = sum(!signal & !refused),
+
+    n_signal = hits + misses,
+    n_noise  = false_alarms + correct_rejections,
+
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # Hautus/loglinear correction:
+    # prevents infinite z values when rates are exactly 0 or 1
+    hit_rate =
+      (hits + 0.5) / (n_signal + 1),
+
+    false_alarm_rate =
+      (false_alarms + 0.5) / (n_noise + 1),
+
+    z_hit = qnorm(hit_rate),
+    z_fa  = qnorm(false_alarm_rate),
+
+    # Sensitivity
+    d_prime = z_hit - z_fa,
+
+    # Criterion
+    # Positive = more conservative / less willing to refuse
+    # Negative = more liberal / more willing to refuse
+    criterion = -0.5 * (z_hit + z_fa),
+
+    # AUC implied by equal-variance SDT
+    auc = pnorm(d_prime / sqrt(2))
+  )
+
+
+# ============================================================
+# 2. SIMPLE INFERENTIAL TESTS
+#
+# Baseline has no meaningful clarity level, so use the
+# fully crossed prompted conditions for prompt/clarity tests.
+# ============================================================
+
+sdt_prompted <- sdt_df %>%
+  filter(
+    prompt_family_short != "No Prompt",
+    !is.na(clarity_level),
+    clarity_level != "none"
+  )
+
+
+# ------------------------------------------------------------
+# Sensitivity model
+#
+# Question:
+# Do model, prompt family, or clarity change discriminability?
+# ------------------------------------------------------------
+
+m_dprime <- lm(
+  d_prime ~
+    model_name +
+    prompt_family_short +
+    clarity_level,
+  data = sdt_prompted
+)
+
+dprime_anova <- car::Anova(
+  m_dprime,
+  type = 2
+)
+
+dprime_anova
+
+
+# ------------------------------------------------------------
+# Criterion model
+#
+# Question:
+# Do model, prompt family, or clarity shift response bias?
+# ------------------------------------------------------------
+
+m_criterion <- lm(
+  criterion ~
+    model_name +
+    prompt_family_short +
+    clarity_level,
+  data = sdt_prompted
+)
+
+criterion_anova <- car::Anova(
+  m_criterion,
+  type = 2
+)
+
+criterion_anova
+
+
+# ============================================================
+# 3. MAKE REPORTABLE STATISTICS TABLE
+# Includes partial eta-squared
+# ============================================================
+
+extract_anova_stats <- function(model, outcome_name) {
+
+  a <- car::Anova(model, type = 2) %>%
+    as.data.frame() %>%
+    rownames_to_column("effect")
+
+  df_error <- df.residual(model)
+
+  a %>%
+    filter(effect != "Residuals") %>%
+    transmute(
+      outcome = outcome_name,
+      effect,
+      df1 = Df,
+      df2 = df_error,
+      F = `F value`,
+      p = `Pr(>F)`,
+      partial_eta2 =
+        (F * df1) /
+        ((F * df1) + df2)
+    )
+}
+
+sdt_stats <- bind_rows(
+  extract_anova_stats(
+    m_dprime,
+    "d_prime"
+  ),
+  extract_anova_stats(
+    m_criterion,
+    "criterion"
+  )
+)
+
+sdt_stats
+
+
+# Nicely formatted version for inspecting/reporting
+sdt_stats_report <- sdt_stats %>%
+  mutate(
+    F = round(F, 2),
+    p_report = case_when(
+      p < .001 ~ "< .001",
+      TRUE ~ sprintf("= %.3f", p)
+    ),
+    partial_eta2 = round(partial_eta2, 2)
+  )
+
+sdt_stats_report
+
+
+# ============================================================
+# 4. MODEL DESCRIPTIVES
+# Useful for reporting direction of model effects
+# ============================================================
+
+model_sdt_summary <- sdt_prompted %>%
+  group_by(model_name) %>%
+  summarise(
+    mean_d_prime = mean(d_prime),
+    se_d_prime =
+      sd(d_prime) / sqrt(n()),
+
+    mean_criterion = mean(criterion),
+    se_criterion =
+      sd(criterion) / sqrt(n()),
+
+    mean_auc = mean(auc),
+
+    .groups = "drop"
+  )
+
+model_sdt_summary
+
+
+# ============================================================
+# 5. PAIRWISE MODEL COMPARISONS
+#
+# Use these if the omnibus model effect on d' or criterion
+# is significant.
+# ============================================================
+
+dprime_model_pairs <- emmeans(
+  m_dprime,
+  pairwise ~ model_name,
+  adjust = "tukey"
+)
+
+criterion_model_pairs <- emmeans(
+  m_criterion,
+  pairwise ~ model_name,
+  adjust = "tukey"
+)
+
+dprime_model_pairs
+criterion_model_pairs
+
+
+# ============================================================
+# 6. COLLAPSE ACROSS CLARITY FOR THE TWO MAIN ROC FIGURES
+#
+# One point = model x prompt family
+#
+# We recompute from raw counts rather than averaging rates.
+# ============================================================
+
+prompt_roc <- analysis_df %>%
+  filter(
+    item_safety %in% c("safe", "unsafe"),
+    !is.na(refusal_score)
+  ) %>%
+  mutate(
+    signal  = item_safety == "unsafe",
+    refused = refusal_score == 1
+  ) %>%
+  group_by(
+    model_name,
+    prompt_family_short
+  ) %>%
+  summarise(
+    hits               = sum(signal & refused),
+    misses             = sum(signal & !refused),
+    false_alarms       = sum(!signal & refused),
+    correct_rejections = sum(!signal & !refused),
+
+    n_signal = hits + misses,
+    n_noise  = false_alarms + correct_rejections,
+
+    .groups = "drop"
+  ) %>%
+  mutate(
+    hit_rate =
+      (hits + 0.5) / (n_signal + 1),
+
+    false_alarm_rate =
+      (false_alarms + 0.5) / (n_noise + 1),
+
+    d_prime =
+      qnorm(hit_rate) -
+      qnorm(false_alarm_rate)
+  )
+
+
+# ============================================================
+# 7. SIMPLE EQUAL-VARIANCE SDT FIT FOR EACH MODEL
+#
+# Under equal-variance SDT:
+#
+#   z(H) = z(FA) + d'
+#
+# Therefore each model needs only ONE fitted parameter: d'.
+#
+# This guarantees a proper monotonic ROC.
+# ============================================================
+
+model_sdt_fits <- prompt_roc %>%
+  group_by(model_name) %>%
+  summarise(
+    d_prime_fit = mean(d_prime),
+    auc_fit = pnorm(d_prime_fit / sqrt(2)),
+    .groups = "drop"
+  )
+
+model_sdt_fits
+
+
+# Generate the fitted ROC curves
+roc_curves <- model_sdt_fits %>%
+  tidyr::crossing(
+    false_alarm_rate =
+      seq(0.001, 0.999, length.out = 500)
+  ) %>%
+  mutate(
+    hit_rate =
+      pnorm(
+        qnorm(false_alarm_rate) +
+          d_prime_fit
+      )
+  )
+
+
+# ============================================================
+# 8. PAPER THEME
+# Based on your existing figure style
+# ============================================================
+
+paper_theme <- theme_minimal() +
+  theme(
+    legend.title = element_blank(),
+
+    text = element_text(
+      size = 24
+    ),
+
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+
+    axis.line = element_line(
+      colour = "black",
+      size = 2,
+      linetype = "solid"
+    ),
+
+    legend.key.size = unit(
+      1.5,
+      "cm"
+    ),
+
+    axis.text = element_text(
+      size = 24
+    )
+  )
+
+
+# ============================================================
+# FIGURE A
+# PROMPT-COLORED OPERATING POINTS
+#
+# Color = prompt family
+# Shape = model
+# No fitted lines
+# ============================================================
+
+p_roc_prompts <- ggplot(
+  prompt_roc,
+  aes(
+    x = false_alarm_rate,
+    y = hit_rate,
+    color = prompt_family_short,
+    shape = model_name
+  )
+) +
+
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed",
+    color = "grey50",
+    linewidth = 0.8
+  ) +
+
+  geom_point(
+    size = 6,
+    alpha = 0.9
+  ) +
+
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, .25),
+    labels = percent_format(accuracy = 1)
+  ) +
+
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, .25),
+    labels = percent_format(accuracy = 1)
+  ) +
+
+  coord_fixed() +
+
+  labs(
+    x = "False Alarm Rate\nRefusal of Safe Requests",
+    y = "Hit Rate\nRefusal of Unsafe Requests",
+    color = NULL,
+    shape = NULL
+  ) +
+
+  paper_theme +
+
+  # For this descriptive plot we DO want both legends:
+  # color tells us prompt, shape tells us model.
+  guides(
+    fill = "none",
+    size = "none",
+    alpha = "none",
+
+    color = guide_legend(
+      override.aes = list(
+        shape = 16,
+        size = 6,
+        alpha = 1,
+        linetype = 0
+      )
+    ),
+
+    shape = guide_legend(
+      override.aes = list(
+        color = "black",
+        size = 6,
+        alpha = 1
+      )
+    )
+  )
+
+p_roc_prompts
+
+
+# ============================================================
+# FIGURE B
+# MODEL-COLORED ROC FITS
+#
+# Color = model
+# Points = observed prompt conditions
+# Lines = simple equal-variance SDT fit
+#
+# Prompt identity is intentionally NOT shown.
+# ============================================================
+
+p_roc_models <- ggplot() +
+
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed",
+    color = "grey50",
+    linewidth = 0.8
+  ) +
+
+  # Model-specific fitted ROC
+  geom_line(
+    data = roc_curves,
+    aes(
+      x = false_alarm_rate,
+      y = hit_rate,
+      color = model_name,
+      group = model_name
+    ),
+    linewidth = 1.8,
+    alpha = 0.95
+  ) +
+
+  # Observed prompt conditions
+  geom_point(
+    data = prompt_roc,
+    aes(
+      x = false_alarm_rate,
+      y = hit_rate,
+      color = model_name
+    ),
+    size = 6,
+    alpha = 0.85
+  ) +
+
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, .25),
+    labels = percent_format(accuracy = 1)
+  ) +
+
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, .25),
+    labels = percent_format(accuracy = 1)
+  ) +
+
+  coord_fixed() +
+
+  labs(
+    x = "False Alarm Rate\nRefusal of Safe Requests",
+    y = "Hit Rate\nRefusal of Unsafe Requests",
+    color = NULL
+  ) +
+
+  paper_theme +
+
+  guides(
+    fill = "none",
+    shape = "none",
+    size = "none",
+    alpha = "none",
+
+    # Here I intentionally show BOTH the line and point
+    # in the model legend so it is obvious which ROC
+    # belongs to which model.
+    color = guide_legend(
+      override.aes = list(
+        shape = 16,
+        size = 6,
+        alpha = 1,
+        linewidth = 1.8
+      )
+    )
+  )
+
+p_roc_models
+
+
+# ============================================================
+# OPTIONAL: MODEL FIT TABLE FOR PAPER / SUPPLEMENT
+# ============================================================
+
+model_sdt_fits %>%
+  mutate(
+    d_prime_fit = round(d_prime_fit, 3),
+    auc_fit = round(auc_fit, 3)
+  )
+
+
+# ============================================================
+# OPTIONAL: SAVE
+# ============================================================
+
+# ggsave(
+#   "ROC_prompt_conditions.png",
+#   p_roc_prompts,
+#   width = 14,
+#   height = 10,
+#   dpi = 300
+# )
+#
+# ggsave(
+#   "ROC_model_fits.png",
+#   p_roc_models,
+#   width = 14,
+#   height = 10,
+#   dpi = 300
+# )
+
+```
+
+```{r,echo=FALSE}
+# ============================================================
+# SDT ROC FIGURE — ONE PANEL PER MODEL
+#
+# Color = prompt family
+# Black curve = fitted SDT ROC
+# Panel title = model name + fitted d'
+# ============================================================
+
+library(tidyverse)
+library(scales)
+library(grid)
+
+
+# ============================================================
+# 1. COMPUTE OBSERVED OPERATING POINTS
+# Collapse across clarity
+# ============================================================
+
+prompt_roc <- analysis_df %>%
+  filter(
+    item_safety %in% c("safe", "unsafe"),
+    !is.na(refusal_score)
+  ) %>%
+  mutate(
+    signal = item_safety == "unsafe",
+    refused = refusal_score == 1
+  ) %>%
+  group_by(
+    model_name,
+    prompt_family_short
+  ) %>%
+  summarise(
+    hits = sum(signal & refused),
+    misses = sum(signal & !refused),
+
+    false_alarms = sum(!signal & refused),
+    correct_rejections = sum(!signal & !refused),
+
+    .groups = "drop"
+  ) %>%
+  mutate(
+    n_signal = hits + misses,
+    n_noise = false_alarms + correct_rejections
+  ) %>%
+  filter(n_signal > 0, n_noise > 0) %>%
+  mutate(
+    # Loglinear correction
+    hit_rate = (hits + 0.5) / (n_signal + 1),
+
+    false_alarm_rate =
+      (false_alarms + 0.5) / (n_noise + 1),
+
+    # Signal detection sensitivity
+    d_prime =
+      qnorm(hit_rate) -
+      qnorm(false_alarm_rate)
+  )
+
+
+# ============================================================
+# 2. FIT ONE SDT ROC PER MODEL
+#
+# Equal-variance Gaussian SDT:
+# z(H) = z(FA) + d'
+#
+# Estimate each model's d' from its prompt operating points.
+# ============================================================
+
+model_sdt_fits <- prompt_roc %>%
+  group_by(model_name) %>%
+  summarise(
+    d_prime_fit = mean(d_prime),
+    auc_fit = pnorm(d_prime_fit / sqrt(2)),
+    .groups = "drop"
+  )
+
+# Display estimates
+print(model_sdt_fits)
+
+
+# ============================================================
+# 3. GENERATE FITTED ROC CURVES
+# ============================================================
+
+roc_curves <- model_sdt_fits %>%
+  tidyr::crossing(
+    false_alarm_rate = seq(
+      0, 1,
+      length.out = 501
+    )
+  ) %>%
+  mutate(
+    hit_rate = pnorm(
+      qnorm(false_alarm_rate) + d_prime_fit
+    )
+  )
+
+
+# ============================================================
+# 4. ORDER PANELS BY DISCRIMINABILITY
+# Highest d' first
+# ============================================================
+
+model_order <- model_sdt_fits %>%
+  arrange(desc(d_prime_fit)) %>%
+  pull(model_name)
+
+prompt_roc <- prompt_roc %>%
+  mutate(
+    model_name = factor(
+      model_name,
+      levels = model_order
+    )
+  )
+
+roc_curves <- roc_curves %>%
+  mutate(
+    model_name = factor(
+      model_name,
+      levels = model_order
+    )
+  )
+
+
+# ============================================================
+# 5. CREATE PANEL LABELS WITH d'
+# ============================================================
+
+model_labels <- model_sdt_fits %>%
+  mutate(
+    # Allow long model names to wrap
+    model_display = stringr::str_wrap(
+      gsub("-", "- ", model_name),
+      width = 25
+    ),
+
+    label = paste0(
+      model_display,
+      "\nd' = ",
+      sprintf("%.2f", d_prime_fit)
+    )
+  ) %>%
+  select(model_name, label) %>%
+  tibble::deframe()
+
+
+# ============================================================
+# 6. PROMPT COLORS
+# ============================================================
+
+prompt_colors <- c(
+  "No Prompt" = "#F26C64",
+  "Answer"    = "#D08B13",
+  "Clarify"   = "#8DAA19",
+  "Evidence"  = "#2DBB45",
+  "Hierarchy" = "#2EBB91",
+  "Safe Help" = "#2EA7D8",
+  "Refuse"    = "#5A88F0",
+  "Source"    = "#C05AE8",
+  "Transform" = "#F04FAF"
+)
+
+
+# ============================================================
+# 7. PLOT — 14 MODEL PANELS
+# Full ROC axes: 0–100%
+# ============================================================
+p_roc_by_model <- ggplot() +
+
+  # Chance discrimination line
+  geom_abline(
+    intercept = 0,
+    slope = 1,
+    linetype = "dashed",
+    color = "grey65",
+    linewidth = 2
+  ) +
+
+  # Fitted SDT ROC curve
+  geom_line(
+    data = roc_curves,
+    aes(
+      x = false_alarm_rate,
+      y = hit_rate,
+      group = model_name
+    ),
+    color = "black",
+    linewidth = 4
+  ) +
+
+  # Observed prompt-specific operating points
+  geom_point(
+    data = prompt_roc,
+    aes(
+      x = false_alarm_rate,
+      y = hit_rate,
+      color = prompt_family_short
+    ),
+    shape = 16,
+    size = 10,
+    alpha = 0.8
+  ) +
+
+  # One panel per model, including d' estimate
+  facet_wrap(
+    ~ model_name,
+    ncol = 4,
+    labeller = as_labeller(model_labels)
+  ) +
+
+  # Prompt colors
+  scale_color_manual(
+    values = prompt_colors,
+    name = NULL
+  ) +
+
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.25),
+    labels = percent_format(accuracy = 1),
+    expand = expansion(add = 0.06)
+  ) +
+
+  scale_y_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.25),
+    labels = percent_format(accuracy = 1),
+    expand = expansion(add = 0.06)
+  ) +
+
+  coord_fixed(
+    ratio = 1,
+    expand = TRUE
+  ) +
+
+  labs(
+    x = "False Alarm Rate\nRefusal of Safe Requests",
+    y = "Hit Rate\nRefusal of Unsafe Requests"
+  ) +
+
+  theme_minimal() +
+
+  theme(
+    legend.title = element_blank(),
+
+    text = element_text(size = 30),
+
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 1.5,
+      linetype = "solid"
+    ),
+
+    legend.key.size = unit(2, "cm"),
+
+    # Smaller axis labels within each facet
+    axis.text = element_text(size = 30),
+
+    # Model name and d'
+    strip.text = element_text(
+      size = 17,
+      face = "bold",
+      lineheight = 1.1
+    ),
+
+    panel.spacing = unit(1.2, "lines"),
+
+    # Move legend inside bottom-right empty space
+    legend.position = "inside",
+    legend.position.inside = c(0.55, 0.1),
+    legend.justification = c(0.5, 0.5),
+
+    legend.text = element_text(size = 30),
+    legend.background = element_blank(),
+    legend.box.background = element_blank()
+  ) +
+
+  guides(
+    fill = "none",
+    shape = "none",
+    size = "none",
+    alpha = "none",
+
+    color = guide_legend(
+      ncol = 3,
+      byrow = TRUE,
+      override.aes = list(
+        shape = 16,
+        size = 12,
+        alpha = 1,
+        linetype = 0
+      )
+    )
+  )
+
+# Display
+p_roc_by_model
+
+
+# ============================================================
+# 8. SAVE HIGH-RESOLUTION FIGURE
+# ============================================================
+# 
+# ggsave(
+#   filename = "ROC_14_models.png",
+#   plot = p_roc_by_model,
+#   width = 20,
+#   height = 19,
+#   dpi = 300,
+#   bg = "white"
+# )
+
+# Need bar graph that shows difference between criterion and discriminability 
+
+```
+
+```{r, echo=FALSE}
+library(tidyverse)
+library(emmeans)
+
+# 1. Omnibus statistical tests
+write_csv(
+  sdt_stats,
+  "SDT_omnibus_stats.csv"
+)
+
+# 2. Model-specific sensitivity and criterion
+model_results <- model_sdt_fits %>%
+  left_join(
+    model_sdt_summary,
+    by = "model_name"
+  ) %>%
+  arrange(desc(d_prime_fit))
+
+write_csv(
+  model_results,
+  "SDT_model_results.csv"
+)
+
+# 3. Estimated marginal means by prompt family
+prompt_results <- bind_rows(
+  as.data.frame(
+    emmeans(m_dprime, ~ prompt_family_short)
+  ) %>%
+    mutate(outcome = "d_prime"),
+
+  as.data.frame(
+    emmeans(m_criterion, ~ prompt_family_short)
+  ) %>%
+    mutate(outcome = "criterion")
+)
+
+write_csv(
+  prompt_results,
+  "SDT_prompt_results.csv"
+)
+
+# 4. Tukey-adjusted pairwise prompt comparisons
+prompt_comparisons <- bind_rows(
+  as.data.frame(
+    pairs(
+      emmeans(m_dprime, ~ prompt_family_short),
+      adjust = "tukey"
+    )
+  ) %>%
+    mutate(outcome = "d_prime"),
+
+  as.data.frame(
+    pairs(
+      emmeans(m_criterion, ~ prompt_family_short),
+      adjust = "tukey"
+    )
+  ) %>%
+    mutate(outcome = "criterion")
+)
+
+write_csv(
+  prompt_comparisons,
+  "SDT_prompt_comparisons.csv"
+)
+
+# 5. Model comparisons for d'
+model_comparisons <- as.data.frame(
+  pairs(
+    emmeans(m_dprime, ~ model_name),
+    adjust = "tukey"
+  )
+)
+
+write_csv(
+  model_comparisons,
+  "SDT_model_comparisons.csv"
+)
+
+# 6. Observed operating points
+write_csv(
+  prompt_roc,
+  "SDT_operating_points.csv"
+)
+
+# 7. Condition-level SDT results
+write_csv(
+  sdt_df,
+  "SDT_condition_level.csv"
+)
+
+library(dplyr)
+library(readr)
+
+# Check available columns
+names(analysis_df)
+
+# Export the columns needed for SDT robustness checks
+sdt_item_data <- analysis_df %>%
+  filter(
+    item_safety %in% c("safe", "unsafe"),
+    !is.na(refusal_score)
+  ) %>%
+  select(
+    model_name,
+    prompt_family_short,
+    clarity_level,
+    item_safety,
+    refusal_score,
+
+    # Include these columns if they exist
+    any_of(c(
+      "item_key",
+      "item_id",
+      "benchmark",
+      "benchmark_name",
+      "dataset",
+      "dataset_name",
+      "source_run",
+      "prompt_variant",
+      "variant_id",
+      "prompt_id"
+    ))
+  )
+
+# Save
+write_csv(
+  sdt_item_data,
+  "SDT_item_level.csv"
+)
+
+# Verify what was exported
+names(sdt_item_data)
+nrow(sdt_item_data)
 ```
 

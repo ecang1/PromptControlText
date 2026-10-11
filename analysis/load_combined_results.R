@@ -14,6 +14,9 @@ load_combined_results <- function(
     "hierarchy_following_score", "unsafe_continuation_score", "stop_compliance_score",
     "llm_confidence", "llm_num_agree"
   )
+  numeric_cols <- c(numeric_cols, paste0("legacy_", c(
+    "refusal_score", "compliance_score", "clarification_score", "abstention_score"
+  )))
   for (column in intersect(numeric_cols, header)) {
     types$cols[[column]] <- readr::col_double()
   }
@@ -21,7 +24,7 @@ load_combined_results <- function(
   # those in the CSV, but avoid allocating several GB of unused text in R.
   for (column in intersect(c(
       "model_output", "metadata", "score", "llm_evidence", "llm_reason",
-      "base_system", "reference_json"), header)) {
+      "base_system", "reference_json", "safety_heuristic_rules"), header)) {
     types$cols[[column]] <- readr::col_skip()
   }
   data <- readr::read_csv(path, col_types = types, show_col_types = FALSE)

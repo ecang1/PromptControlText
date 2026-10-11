@@ -9,14 +9,16 @@ python -m scoring.compile_results
 This rebuilds `artifacts/phase1_results_combined_labeled.csv` from saved labeled
 outputs. It is offline: it makes no provider calls and does not rerun judging.
 It includes all eight original jobs (four prompted and four controls), six new
-open-model prompted jobs, and the three completed frontier main runs. The pilot
-is excluded. A complete compilation contains 2,450,830 rows:
+open-model prompted jobs, completed new no-system controls, and the three
+completed frontier main runs. The pilot is excluded. Before the six new controls,
+the compilation contains 2,450,830 rows:
 
 | Source | Rows |
 |---|---:|
 | Four original open models, prompted | 970,560 |
 | Four original no-system controls | 13,480 |
 | Six new open models, prompted | 1,455,840 |
+| Six new safety no-system controls, once generated and judged | 5,100 |
 | Frontier main, including provider blocks | 10,950 |
 
 The CSV contains all 13 generator models and the union of their columns, keeping
@@ -24,13 +26,26 @@ answers, labels, prompt conditions, input context, references, and provider
 outcomes. `source_run`, `analysis_study`, and `model_cohort` identify provenance.
 The original Qwen-2.5-72B prompted file lacks `model_name`; compilation fills it
 from its known run identity. Control/prompted groups remain distinct. There are
-no new no-system controls for the six new open models.
+no new no-system controls in the earlier saved runs. To generate and judge the
+missing controls, use [the baseline submission instructions](new-model-baselines.md).
+These new controls cover the 850 XSTest/HarmBench items per model for refusal
+analysis; they exclude IHEval. Once all six are complete, the full compilation
+has 2,455,930 rows. Completed
+controls are included automatically; missing or unfinished new controls are
+skipped with warnings. Add `--require-new-controls` to require all six before
+replacing the combined CSV.
 
 For frontier answers, the compiler adds the same heuristic score columns and
 output-quality flags used by the original generation pipeline. These remain
 separate from the LLM policy labels and benchmark-native task correctness.
 Empty provider blocks retain blank labels and blank scores. The compiler never
 converts a provider block into a policy refusal.
+
+For the improved CPU-only refusal scorer, use
+`python -m scoring.compile_results --safety-heuristic v2`. This applies v2 to all
+eligible XSTest/HarmBench answers, preserving the original scores in `legacy_*`
+columns. See [validation, limitations, and R instructions](heuristic-scoring.md).
+The default command retains the original scoring behavior.
 
 Legacy missing and invalid labels are retained with explicit `judge_status`;
 they are not inferred from majority votes or keyword scores. The file next to
@@ -56,7 +71,8 @@ python -m scoring.compile_results --open-models-only --output .local/open_models
 ## Use in the analysis notebook
 
 `analysis/analysis.Rmd` reads the same combined CSV path as before. `all_data`
-contains all 13 models and all 2,450,830 rows, including empty provider blocks.
+contains all 13 models and all compiled rows, including empty provider blocks
+and any completed new controls.
 The loader uses explicit numeric score types and skips unused long answer/metadata
 columns. Study selection happens separately in `analysis_data`, which excludes
 empty provider blocks from response analysis. Legacy missing or

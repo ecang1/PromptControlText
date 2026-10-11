@@ -1,0 +1,2 @@
+# CPU-only dependency for the official IHEval safety check. No model loading.
+rouge-score==0.1.2

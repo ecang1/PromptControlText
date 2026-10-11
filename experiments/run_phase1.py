@@ -119,7 +119,7 @@ def _load_generation_checkpoint(filepath, generator_model, tasks):
     return records, completed
 
 
-def run_experiment(output_filepath: str, generator_model: str = "Qwen2.5-72B-Instruct", mock_mode: bool = False, limit: int = 0, max_workers: int = 32, data_dir: str = None, registry_version: str = "v3", resume: bool = False):
+def run_experiment(output_filepath: str, generator_model: str = "Qwen2.5-72B-Instruct", mock_mode: bool = False, limit: int = 0, max_workers: int = 32, data_dir: str = None, registry_version: str = "v3", resume: bool = False, base_url: str = "http://localhost:8000/v1", safety_only: bool = False):
     output_filepath = os.fspath(output_filepath)
     print("Loading Registry...")
     # Setup Paths
@@ -180,6 +180,9 @@ def run_experiment(output_filepath: str, generator_model: str = "Qwen2.5-72B-Ins
     else:
         print(f"Warning: {iheval_path} not found. Run download_data.py")
         
+    if safety_only:
+        items = [item for item in items if item.benchmark in {"XSTest", "HarmBench"}]
+        print("Safety-only run: retaining XSTest and HarmBench; excluding IHEval.")
     if not items:
         raise ValueError("No benchmark items loaded.")
 
@@ -190,7 +193,7 @@ def run_experiment(output_filepath: str, generator_model: str = "Qwen2.5-72B-Ins
     if mock_mode:
          client = LLMClient(mock_mode=True, mock_response="I cannot help with that.", enable_cache=True)
     else:
-         client = VLLMClient(model_name=generator_model, enable_cache=True)
+         client = VLLMClient(model_name=generator_model, base_url=base_url, enable_cache=True)
 
     # Build the full list of (item, family, clarity, variant, prompt_text) tasks.
     # iter_prompt_triples() handles the v3 crossed design and control schema.
@@ -306,6 +309,8 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0, help="Limit the number of benchmark items to evaluate.")
     parser.add_argument("--mock", action="store_true", help="Use mock client and fixture paths for testing.")
     parser.add_argument("--resume", action="store_true", help="Keep matching saved responses and generate only missing or empty conditions.")
+    parser.add_argument("--base-url", default="http://localhost:8000/v1", help="Local vLLM endpoint; use separate ports for jobs sharing a node.")
+    parser.add_argument("--safety-only", action="store_true", help="Generate only XSTest/HarmBench answers for refusal/compliance analysis.")
     parser.add_argument("--max-workers", type=int, default=32, help="Number of concurrent generation threads.")
     parser.add_argument("--data-dir", type=str, default=None, help="Absolute path to dataset directory (overrides default).")
     parser.add_argument("--registry-version", type=str, default="v3",
@@ -316,4 +321,4 @@ if __name__ == "__main__":
     
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     out = os.path.join(base, args.output_file)
-    run_experiment(out, args.generator_model, mock_mode=args.mock, limit=args.limit, max_workers=args.max_workers, data_dir=args.data_dir, registry_version=args.registry_version, resume=args.resume)
+    run_experiment(out, args.generator_model, mock_mode=args.mock, limit=args.limit, max_workers=args.max_workers, data_dir=args.data_dir, registry_version=args.registry_version, resume=args.resume, base_url=args.base_url, safety_only=args.safety_only)

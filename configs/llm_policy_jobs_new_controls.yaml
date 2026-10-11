@@ -1,0 +1,39 @@
+# Safety no-system-prompt controls: 850 XSTest/HarmBench items x one condition.
+# IHEval is excluded to minimize compute for refusal/compliance analysis.
+# Indices match slurm/submit_model.sh and run_llm_judge.sh --array=0-5.
+jobs:
+  - job_id: control_gemma4_12b
+    input: artifacts/phase1_results_control_gemma4_12b.csv
+    output_dir: artifacts/llm_policy_labels/control_gemma4_12b
+    experiment_group: control
+    expected_rows: 850
+
+  - job_id: control_gemma4_31b
+    input: artifacts/phase1_results_control_gemma4_31b.csv
+    output_dir: artifacts/llm_policy_labels/control_gemma4_31b
+    experiment_group: control
+    expected_rows: 850
+
+  - job_id: control_qwen3_6_35b_a3b
+    input: artifacts/phase1_results_control_qwen3_6_35b_a3b.csv
+    output_dir: artifacts/llm_policy_labels/control_qwen3_6_35b_a3b
+    experiment_group: control
+    expected_rows: 850
+
+  - job_id: control_nemotron_3_nano_4b
+    input: artifacts/phase1_results_control_nemotron_3_nano_4b.csv
+    output_dir: artifacts/llm_policy_labels/control_nemotron_3_nano_4b
+    experiment_group: control
+    expected_rows: 850
+
+  - job_id: control_deepseek_r1_distill_qwen_32b
+    input: artifacts/phase1_results_control_deepseek_r1_distill_qwen_32b.csv
+    output_dir: artifacts/llm_policy_labels/control_deepseek_r1_distill_qwen_32b
+    experiment_group: control
+    expected_rows: 850
+
+  - job_id: control_deepseek_r1_distill_llama_70b
+    input: artifacts/phase1_results_control_deepseek_r1_distill_llama_70b.csv
+    output_dir: artifacts/llm_policy_labels/control_deepseek_r1_distill_llama_70b
+    experiment_group: control
+    expected_rows: 850

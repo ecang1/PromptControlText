@@ -9,7 +9,12 @@
 # auto-cancels dependents — if the smoke test fails).
 #
 # Usage:
-#   slurm/submit_model.sh <slug>
+#   bash slurm/submit_model.sh <slug>                 # prompted run
+#   bash slurm/submit_model.sh <slug> --control       # no-prompt baseline only
+#   bash slurm/submit_model.sh <slug> --control --judge  # also queue its judge
+# Controls run XSTest/HarmBench only (850 items) for refusal/compliance analysis,
+# reuse the validated model setup, and skip the extra smoke-test boot.
+# Add --smoke to a control submission to request a fresh smoke test first.
 #
 # Slugs (must match configs/model_registry.yaml):
 #   gemma4_12b
@@ -26,13 +31,29 @@
 
 set -eo pipefail
 
-SLUG="$1"
+SLUG="${1:-}"
 if [ -z "$SLUG" ]; then
-    echo "Usage: $0 <slug>"
+    echo "Usage: $0 <slug> [--control] [--judge] [--smoke]"
+    exit 1
+fi
+shift
+REGISTRY_VERSION=v3
+SUBMIT_JUDGE=0
+CONTROL_SMOKE=0
+for option in "$@"; do
+    case "$option" in
+        --control) REGISTRY_VERSION=control ;;
+        --judge) SUBMIT_JUDGE=1 ;;
+        --smoke) CONTROL_SMOKE=1 ;;
+        *) echo "ERROR: Unknown option: $option"; exit 1 ;;
+    esac
+done
+if [ "$SUBMIT_JUDGE" = 1 ] && [ "$REGISTRY_VERSION" != control ]; then
+    echo "ERROR: --judge currently requires --control. Prompted judges use slurm/run_llm_judge.sh."
     exit 1
 fi
 
-PROJECT_DIR=/scratch/gpfs/JORDANAT/mg9965/PromptControlText
+PROJECT_DIR=${PROJECT_DIR:-/scratch/gpfs/JORDANAT/mg9965/PromptControlText}
 SMOKE_SCRIPT="$PROJECT_DIR/slurm/run_smoke_test.sh"
 GENERIC_SCRIPT="$PROJECT_DIR/slurm/run_model_generic.sh"
 
@@ -77,27 +98,75 @@ case "$SLUG" in
     exit 1 ;;
 esac
 
+# Indices match configs/llm_policy_jobs_new_controls.yaml, not GPU counts.
+case "$SLUG" in
+    gemma4_12b) JUDGE_TASK=0 ;;
+    gemma4_31b) JUDGE_TASK=1 ;;
+    qwen3_6_35b_a3b) JUDGE_TASK=2 ;;
+    nemotron_3_nano_4b) JUDGE_TASK=3 ;;
+    deepseek_r1_distill_qwen_32b) JUDGE_TASK=4 ;;
+    deepseek_r1_distill_llama_70b) JUDGE_TASK=5 ;;
+    *)
+        if [ "$SUBMIT_JUDGE" = 1 ]; then
+            echo "ERROR: No control judge is configured for $SLUG."
+            exit 1
+        fi ;;
+esac
+
 mkdir -p "$PROJECT_DIR/logs"
 
 EXPORT_VARS="ALL,MODEL_DIR_NAME=$MODEL_DIR_NAME,MODEL_SLUG=$SLUG,TENSOR_PARALLEL_SIZE=$TP,MAX_MODEL_LEN=$MAX_LEN,GPU_MEMORY_UTILIZATION=$MEM,IS_MOE=$MOE,IS_GGUF=$GGUF,GGUF_FILE=$GGUF_FILE"
+JOB_PREFIX=pct
+RUN_ARGS=()
+if [ "$REGISTRY_VERSION" = control ]; then
+    JOB_PREFIX=pct_ctrl
+    OUTPUT_FILE="artifacts/phase1_results_control_${SLUG}.csv"
+    SAFETY_ONLY=1
+    RUN_ARGS+=(--time="${CONTROL_TIME_LIMIT:-01:00:00}" --cpus-per-task=6)
+else
+    SAFETY_ONLY=0
+    OUTPUT_FILE="artifacts/phase1_results_${SLUG}.csv"
+fi
+EXPORT_VARS="$EXPORT_VARS,REGISTRY_VERSION=$REGISTRY_VERSION,OUTPUT_FILE=$OUTPUT_FILE,SAFETY_ONLY=$SAFETY_ONLY"
 if [ -n "$CONDA_ENV_OVERRIDE" ]; then
     EXPORT_VARS="$EXPORT_VARS,CONDA_ENV=$CONDA_ENV_OVERRIDE"
     echo "  (using conda env: $CONDA_ENV_OVERRIDE)"
 fi
 
-echo "Submitting smoke test for $SLUG (GPUs=$GPUS, TP=$TP)..."
-SMOKE_JOB_ID=$(sbatch --parsable \
-    --job-name="pct_smoke_${SLUG}" \
-    --gres="gpu:${GPUS}" \
-    --export="$EXPORT_VARS" \
-    "$SMOKE_SCRIPT")
-echo "  -> smoke test job id: $SMOKE_JOB_ID"
+GENERATION_DEPENDENCY=()
+if [ "$REGISTRY_VERSION" != control ] || [ "$CONTROL_SMOKE" = 1 ]; then
+    echo "Submitting smoke test for $SLUG (GPUs=$GPUS, TP=$TP)..."
+    SMOKE_JOB_ID=$(sbatch --parsable \
+        --job-name="${JOB_PREFIX}_smoke_${SLUG}" \
+        --gres="gpu:${GPUS}" \
+        --export="$EXPORT_VARS" \
+        "$SMOKE_SCRIPT")
+    echo "  -> smoke test job id: $SMOKE_JOB_ID"
+    GENERATION_DEPENDENCY+=(--dependency="afterok:${SMOKE_JOB_ID}")
+else
+    echo "Skipping repeated smoke test for the existing $SLUG setup."
+fi
 
-echo "Submitting full job for $SLUG (dependent on smoke test succeeding)..."
+echo "Submitting $REGISTRY_VERSION job for $SLUG (GPUs=$GPUS, TP=$TP)..."
 FULL_JOB_ID=$(sbatch --parsable \
-    --job-name="pct_${SLUG}" \
+    --job-name="${JOB_PREFIX}_${SLUG}" \
     --gres="gpu:${GPUS}" \
-    --dependency="afterok:${SMOKE_JOB_ID}" \
+    "${GENERATION_DEPENDENCY[@]}" \
+    --kill-on-invalid-dep=yes \
     --export="$EXPORT_VARS" \
+    "${RUN_ARGS[@]}" \
     "$GENERIC_SCRIPT")
-echo "  -> full job id: $FULL_JOB_ID (will run only if job $SMOKE_JOB_ID succeeds)"
+echo "  -> generation job id: $FULL_JOB_ID; output: $OUTPUT_FILE"
+
+if [ "$SUBMIT_JUDGE" = 1 ]; then
+    JUDGE_JOB_ID=$(sbatch --parsable \
+        --job-name="pct_ctrl_judge_${SLUG}" \
+        --array="$JUDGE_TASK" \
+        --dependency="afterok:${FULL_JOB_ID}" \
+        --kill-on-invalid-dep=yes \
+        --time="${CONTROL_JUDGE_TIME_LIMIT:-00:30:00}" \
+        --cpus-per-task=4 \
+        --export="ALL,JUDGE_JOBS_CONFIG=configs/llm_policy_jobs_new_controls.yaml,JUDGE_REQUIRE_COMPLETE=1" \
+        "$PROJECT_DIR/slurm/run_llm_judge.sh")
+    echo "  -> control judge job id: $JUDGE_JOB_ID (after successful generation $FULL_JOB_ID)"
+fi

@@ -142,6 +142,33 @@ def test_dead_server_stops_remaining_requests_and_saves_new_progress(generation_
     assert rows["item_id"].nunique() == 30
 
 
+def test_safety_control_filters_by_benchmark_omits_system_and_resumes(tmp_path, monkeypatch):
+    items = [EvalItem(item_id=benchmark, benchmark=benchmark, domain="test",
+                      input_text=f"Request for {benchmark}", gold_label="safe")
+             for benchmark in ("XSTest", "HarmBench", "IHEval")]
+    monkeypatch.setattr(runner, "load_xstest", lambda _: items[:1])
+    monkeypatch.setattr(runner, "load_harmbench", lambda _: items[1:2])
+    monkeypatch.setattr(runner, "load_iheval", lambda _: items[2:])
+    client = MagicMock()
+    client.generate.return_value = ("A mock response", {})
+    constructor = MagicMock(return_value=client)
+    monkeypatch.setattr(runner, "VLLMClient", constructor)
+    path = tmp_path / "control.csv"
+    kwargs = dict(generator_model="test-model", registry_version="control", safety_only=True,
+                  base_url="http://localhost:23456/v1", resume=True, max_workers=1)
+    runner.run_experiment(path, **kwargs)
+    rows = pd.read_csv(path, keep_default_na=False)
+    assert set(rows["benchmark"]) == {"XSTest", "HarmBench"} and len(rows) == 2
+    assert set(rows["prompt_family"]) == {"No-system-prompt"}
+    assert set(rows["clarity_level"]) == {""}
+    assert set(rows["prompt_variant"]) == {"v1"}
+    assert constructor.call_args.kwargs["base_url"] == kwargs["base_url"]
+    assert client.generate.call_count == 2
+    assert all(call.kwargs["system_prompt"] is None for call in client.generate.call_args_list)
+    runner.run_experiment(path, **kwargs)
+    assert client.generate.call_count == 2
+
+
 def test_dead_server_retains_successful_inflight_response(generation_run, monkeypatch):
     from threading import Event
     from models.vllm_client import ServerUnavailableError

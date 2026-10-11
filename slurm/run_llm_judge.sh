@@ -35,6 +35,9 @@
 # Indices: 0=gemma4_12b, 1=gemma4_31b, 2=qwen3_6_35b_a3b,
 #          3=nemotron_3_nano_4b, 4=deepseek_qwen_32b, 5=deepseek_llama_70b.
 # Inputs and output paths come from configs/llm_policy_jobs_new_models.yaml.
+# New no-prompt controls use the same indices in a separate registry:
+#   sbatch --export=ALL,JUDGE_JOBS_CONFIG=configs/llm_policy_jobs_new_controls.yaml,JUDGE_REQUIRE_COMPLETE=1 slurm/run_llm_judge.sh
+# Or queue generation and dependent judging: bash slurm/submit_new_controls.sh
 # Partial inputs fail validation before starting the vLLM server.
 # =============================================================================
 
@@ -52,6 +55,9 @@ fi
 # Each array task gets its own port so tasks can run on the same node if needed
 VLLM_PORT=$((${JUDGE_PORT_BASE:-8000} + TASK))
 JUDGE_JOBS_CONFIG=${JUDGE_JOBS_CONFIG:-configs/llm_policy_jobs_new_models.yaml}
+if [[ "$JUDGE_JOBS_CONFIG" == *llm_policy_jobs_new_controls.yaml ]] && [ -z "${JUDGE_PORT_BASE:-}" ]; then
+    VLLM_PORT=$((20000 + ${SLURM_JOB_ID:-0} % 30000))
+fi
 
 # ------------------------------------------------------------------
 # 1. Configuration
@@ -143,7 +149,7 @@ export TRANSFORMERS_OFFLINE=1
 # ------------------------------------------------------------------
 # Preserve the GPU assigned by SLURM when array tasks share a node.
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
-export OMP_NUM_THREADS=32
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-6}"
 export TOKENIZERS_PARALLELISM=true
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export NCCL_P2P_LEVEL=NVL

@@ -1,0 +1,296 @@
+{
+  "output": "artifacts/phase1_results_combined_labeled_heuristic_v2.csv",
+  "total_rows": 2450830,
+  "by_source": {
+    "phase1_qwen25_72b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 241970,
+        "invalid_judgment": 659,
+        "missing_judgment": 11
+      },
+      "policy_labels": {
+        "clarification": 102902,
+        "compliance": 92825,
+        "safe_redirection": 10829,
+        "parse_error": 659,
+        "refusal": 28464,
+        "source_isolation": 801,
+        "hierarchy_preservation": 6149,
+        "missing": 11
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_qwen25_72b/labeled.csv",
+      "sha256": "1a8d0fd4ab7a611b9e8fb0096b64ede930b8a41b51b145fe089f48379c605968"
+    },
+    "phase1_llama31_8b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 242322,
+        "invalid_judgment": 318
+      },
+      "policy_labels": {
+        "refusal": 58669,
+        "compliance": 113243,
+        "clarification": 57817,
+        "hierarchy_preservation": 7038,
+        "safe_redirection": 4026,
+        "parse_error": 318,
+        "source_isolation": 1529
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_llama31_8b/labeled.csv",
+      "sha256": "d03a8975c4976d39d5e2f0960b7e8fdfa30f4c7afcaf8f10575990ee29464e4d"
+    },
+    "phase1_llama33_70b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 242087,
+        "invalid_judgment": 553
+      },
+      "policy_labels": {
+        "clarification": 80677,
+        "compliance": 113467,
+        "refusal": 34947,
+        "safe_redirection": 5031,
+        "parse_error": 553,
+        "hierarchy_preservation": 7020,
+        "source_isolation": 945
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_llama33_70b/labeled.csv",
+      "sha256": "94435f6be2649f6639195ad29e49bd9d0cc4a3322476f7aca453f95913e83187"
+    },
+    "phase1_qwen2_7b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 242261,
+        "invalid_judgment": 379
+      },
+      "policy_labels": {
+        "clarification": 82963,
+        "refusal": 38577,
+        "safe_redirection": 3837,
+        "compliance": 111386,
+        "parse_error": 379,
+        "source_isolation": 602,
+        "hierarchy_preservation": 4896
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_qwen2_7b/labeled.csv",
+      "sha256": "e68358ed58c926121a9be914832245cf8dece48862fcc66d08e77d27093e2f6a"
+    },
+    "control_qwen25_72b": {
+      "rows": 3370,
+      "judge_status": {
+        "missing_judgment": 24,
+        "judged": 3336,
+        "invalid_judgment": 10
+      },
+      "policy_labels": {
+        "missing": 24,
+        "refusal": 355,
+        "safe_redirection": 115,
+        "compliance": 1624,
+        "clarification": 1195,
+        "parse_error": 10,
+        "hierarchy_preservation": 45,
+        "source_isolation": 2
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_qwen25_72b/labeled.csv",
+      "sha256": "b2cc34c057e85507f5082faaea3b28221fcd61d8fe1b450f0f49f578b28d42ce"
+    },
+    "control_llama31_8b": {
+      "rows": 3370,
+      "judge_status": {
+        "judged": 3368,
+        "invalid_judgment": 2
+      },
+      "policy_labels": {
+        "refusal": 606,
+        "safe_redirection": 57,
+        "clarification": 798,
+        "compliance": 1869,
+        "parse_error": 2,
+        "hierarchy_preservation": 37,
+        "source_isolation": 1
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_llama31_8b/labeled.csv",
+      "sha256": "b899674a6ce0f9062b1534ab9daee932be2a82426a6d15362e9a91984b2e9c10"
+    },
+    "control_llama33_70b": {
+      "rows": 3370,
+      "judge_status": {
+        "judged": 3365,
+        "invalid_judgment": 5
+      },
+      "policy_labels": {
+        "refusal": 462,
+        "clarification": 990,
+        "compliance": 1805,
+        "safe_redirection": 57,
+        "parse_error": 5,
+        "hierarchy_preservation": 51
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_llama33_70b/labeled.csv",
+      "sha256": "a1bbcb961dd0c6a55ea5640e7708713fc64fac5980c49a0784f51f5f0353ea8f"
+    },
+    "control_qwen2_7b": {
+      "rows": 3370,
+      "judge_status": {
+        "judged": 3361,
+        "invalid_judgment": 9
+      },
+      "policy_labels": {
+        "refusal": 529,
+        "safe_redirection": 47,
+        "parse_error": 9,
+        "compliance": 1800,
+        "clarification": 951,
+        "hierarchy_preservation": 34
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_qwen2_7b/labeled.csv",
+      "sha256": "a0e6340f313235c43de7c8fc1c1c10f6e091f67c1fa888477cec8d787cabf298"
+    },
+    "phase1_gemma4_12b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 242266,
+        "invalid_judgment": 374
+      },
+      "policy_labels": {
+        "clarification": 87421,
+        "compliance": 91636,
+        "refusal": 55492,
+        "safe_redirection": 3039,
+        "parse_error": 374,
+        "hierarchy_preservation": 4060,
+        "source_isolation": 618
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_gemma4_12b/labeled.csv",
+      "sha256": "6034688905ecce291d3ed47b8740a15320fb5e3342a6f7d0b4a33bf848b62e31"
+    },
+    "phase1_gemma4_31b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 242300,
+        "invalid_judgment": 340
+      },
+      "policy_labels": {
+        "clarification": 87531,
+        "compliance": 92879,
+        "parse_error": 340,
+        "refusal": 53355,
+        "safe_redirection": 2781,
+        "hierarchy_preservation": 4747,
+        "source_isolation": 1007
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_gemma4_31b/labeled.csv",
+      "sha256": "dda0e106163c63755ac50c55abb7740ba1051c7babd6e2914ef8c59b255b2613"
+    },
+    "phase1_qwen3_6_35b_a3b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 240616,
+        "invalid_judgment": 2024
+      },
+      "policy_labels": {
+        "compliance": 117421,
+        "safe_redirection": 15413,
+        "clarification": 60774,
+        "refusal": 41802,
+        "parse_error": 2024,
+        "source_isolation": 1668,
+        "hierarchy_preservation": 3538
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_qwen3_6_35b_a3b/labeled.csv",
+      "sha256": "9c005654b29724e2bdac78b8de640fd560af83b50f2b1f72744c0faeb358d1ae"
+    },
+    "phase1_nemotron_3_nano_4b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 241974,
+        "invalid_judgment": 666
+      },
+      "policy_labels": {
+        "refusal": 42565,
+        "compliance": 97514,
+        "safe_redirection": 19974,
+        "hierarchy_preservation": 2560,
+        "clarification": 79178,
+        "parse_error": 666,
+        "source_isolation": 183
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_nemotron_3_nano_4b/labeled.csv",
+      "sha256": "51f8a7fa824db01123a411155a2ec187f743dbc54c27851bf786e81e76fb6b8c"
+    },
+    "phase1_deepseek_r1_distill_qwen_32b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 239893,
+        "invalid_judgment": 2747
+      },
+      "policy_labels": {
+        "clarification": 92892,
+        "safe_redirection": 6038,
+        "compliance": 114636,
+        "parse_error": 2747,
+        "refusal": 17970,
+        "hierarchy_preservation": 8049,
+        "source_isolation": 308
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_deepseek_r1_distill_qwen_32b/labeled.csv",
+      "sha256": "7ec6f044f560e3b87b42a2481a643e17123aa9b92f3a697dfe1b866699e492d4"
+    },
+    "phase1_deepseek_r1_distill_llama_70b": {
+      "rows": 242640,
+      "judge_status": {
+        "judged": 239784,
+        "invalid_judgment": 2856
+      },
+      "policy_labels": {
+        "clarification": 95280,
+        "compliance": 112988,
+        "parse_error": 2856,
+        "refusal": 16371,
+        "safe_redirection": 7391,
+        "hierarchy_preservation": 7630,
+        "source_isolation": 124
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_deepseek_r1_distill_llama_70b/labeled.csv",
+      "sha256": "d0986b0f37fbe196c2a411e3523308e38964a2e0e20df5d2d6a52fa8d3e71dbf"
+    },
+    "frontier_main": {
+      "rows": 10950,
+      "judge_status": {
+        "judged": 10440,
+        "not_applicable_empty_provider_block": 510
+      },
+      "policy_labels": {
+        "clarification": 1319,
+        "compliance": 5286,
+        "refusal": 3171,
+        "safe_redirection": 650,
+        "missing": 510,
+        "source_isolation": 7,
+        "hierarchy_preservation": 7
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/.local/frontier/judge-main/labeled_all_cases.csv",
+      "sha256": "96100c6bc78062c7e97bbc6b066cfa6b9cc7c9468ed1467cb9e09985f8338cfd"
+    }
+  },
+  "by_study": {
+    "open_models": 2439880,
+    "frontier_main": 10950
+  },
+  "by_judge_status": {
+    "judged": 2439343,
+    "invalid_judgment": 10942,
+    "missing_judgment": 35,
+    "not_applicable_empty_provider_block": 510
+  },
+  "safety_heuristic": "v2",
+  "by_safety_heuristic_status": {
+    "scored": 623692,
+    "not_applicable_benchmark": 1826670,
+    "not_applicable_empty_response": 468
+  },
+  "safety_heuristic_version": "safety-heuristic-v2",
+  "safety_heuristic_sha256": "62b60139ae3430870760082cf550a4e74e56cfab5d1830928c2f8975eb0f58f2"
+}

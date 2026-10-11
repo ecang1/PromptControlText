@@ -20,3 +20,9 @@ core.*
 !.env.example
 .secrets/
 .local/
+
+# Rebuild locally from saved judgments; these exceed GitHub's LFS object limit.
+/artifacts/phase1_results_combined_labeled*.csv
+
+# Generated item-level analysis table; exceeds GitHub's normal file-size limit.
+/analysis/SDT_item_level.csv

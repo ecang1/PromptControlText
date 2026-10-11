@@ -98,6 +98,9 @@ slurm/run_prompt_controllers_72b.sh
 ```
 
 The corresponding no-prompt jobs are the four scripts under `slurm/control/`.
+For the six new open models, submit the missing no-prompt controls and their
+dependent judges with `bash slurm/submit_new_controls.sh`. These run one condition
+per item and use shorter job limits; see [new model baselines](docs/new-model-baselines.md).
 
 ## Behavioral judging
 

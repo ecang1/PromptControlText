@@ -2,7 +2,7 @@
 
 python -m scoring.compile_results
 Rebuilds artifacts/phase1_results_combined_labeled.csv from the original eight
-jobs, six new open-model jobs, and all verified frontier main cases.
+jobs, six new prompted jobs, completed new controls, and verified frontier cases.
 """
 import argparse
 from collections import Counter
@@ -27,6 +27,7 @@ SCORE_FIELDS = ["malformed_output", "refusal_score", "compliance_score", "clarif
                 "abstention_score", "hierarchy_following_score", "unsafe_continuation_score",
                 "stop_compliance_score"]
 KEY_FIELDS = ["benchmark", "item_id", "prompt_family", "clarity_level", "prompt_variant"]
+SAFETY_FIELDS = ["refusal_score", "compliance_score", "clarification_score", "abstention_score"]
 
 
 def _path(path):
@@ -34,21 +35,37 @@ def _path(path):
     return path if path.is_absolute() else ROOT / path
 
 
-def discover_sources(include_frontier=True, prepared_dir=ROOT / ".local/frontier/judge-main"):
+def discover_sources(include_frontier=True, prepared_dir=ROOT / ".local/frontier/judge-main",
+                     require_new_controls=False):
     sources = []
     for registry, cohort in [("configs/llm_policy_jobs.yaml", "original_open_models"),
-                             ("configs/llm_policy_jobs_new_models.yaml", "new_open_models")]:
+                             ("configs/llm_policy_jobs_new_models.yaml", "new_open_models"),
+                             ("configs/llm_policy_jobs_new_controls.yaml", "new_open_models")]:
+        new_controls = registry.endswith("_new_controls.yaml")
         for job in load_jobs(ROOT / registry):
             directory = _path(job["output_dir"])
-            manifest = json.loads((directory / "manifest.json").read_text())
+            manifest_path = directory / "manifest.json"
+            if new_controls and not manifest_path.exists():
+                if require_new_controls:
+                    raise ValueError(f"{job['job_id']}: control judgments are missing; finish generation and judging first")
+                logger.warning("Skipping %s: control judgments are not available yet", job["job_id"])
+                continue
+            manifest = json.loads(manifest_path.read_text())
             if manifest.get("job_id") != job["job_id"]:
                 raise ValueError(f"{job['job_id']}: saved judge job ID differs")
+            if new_controls and (not manifest.get("complete")
+                                 or manifest.get("total_rows") != job["expected_rows"]
+                                 or manifest.get("valid_labeled_rows") != job["expected_rows"]):
+                if require_new_controls:
+                    raise ValueError(f"{job['job_id']}: control judging is incomplete; resubmit its judge with --resume")
+                logger.warning("Skipping %s: control judging is incomplete", job["job_id"])
+                continue
             sources.append({"job_id": job["job_id"], "path": directory / "labeled.csv",
                             "expected_rows": job.get("expected_rows", manifest["total_rows"]),
                             "analysis_study": "open_models", "model_cohort": cohort,
                             "experiment_group": job["experiment_group"],
                             "default_model": "Qwen--Qwen2.5-72B-Instruct" if job["job_id"] == "phase1_qwen25_72b" else "",
-                            "judge_manifest": manifest})
+                            "judge_manifest": manifest, "require_complete": new_controls})
     if include_frontier:
         prepared_dir = Path(prepared_dir)
         # Regenerate portable, hash-verified inputs from the frozen upload; this
@@ -72,8 +89,10 @@ def _frontier_scores(row):
         row.update({f"{key}_score": value for key, value in score_item(row["benchmark"], row["model_output"]).items()})
 
 
-def compile_sources(sources, output_path):
+def compile_sources(sources, output_path, safety_heuristic="v1"):
     """Stream the union of source columns; preserve missing/error labels explicitly."""
+    if safety_heuristic not in {"v1", "v2"}:
+        raise ValueError("safety_heuristic must be v1 or v2")
     output_path = Path(output_path)
     paths = [Path(source["path"]).resolve() for source in sources]
     if len(paths) != len(set(paths)) or output_path.resolve() in paths:
@@ -87,10 +106,18 @@ def compile_sources(sources, output_path):
             raise ValueError(f"{source['job_id']}: missing required columns {sorted(required - set(header))}")
         fields.extend(field for field in header if field not in fields)
     fields.extend(field for field in SCORE_FIELDS if field not in fields)
+    if safety_heuristic == "v2":
+        fields.extend(field for field in ["safety_heuristic_version", "safety_heuristic_status", "safety_heuristic_rules",
+                                         *["legacy_" + field for field in SAFETY_FIELDS]] if field not in fields)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     csv.field_size_limit(16 * 1024 * 1024)
     report = {"output": str(output_path), "total_rows": 0, "by_source": {},
-              "by_study": Counter(), "by_judge_status": Counter()}
+              "by_study": Counter(), "by_judge_status": Counter(),
+              "safety_heuristic": safety_heuristic, "by_safety_heuristic_status": Counter()}
+    if safety_heuristic == "v2":
+        from scoring.safety_heuristic import VERSION, LABELS, classify_response
+        report["safety_heuristic_version"] = VERSION
+        report["safety_heuristic_sha256"] = hashlib.sha256((ROOT / "scoring/safety_heuristic.py").read_bytes()).hexdigest()
     temp_path = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", newline="", encoding="utf-8", dir=output_path.parent,
@@ -139,6 +166,25 @@ def compile_sources(sources, output_path):
                                 row["score_source"] = "not_applicable_empty_provider_block"
                         else:
                             row["score_source"] = "original_generation"
+                        if safety_heuristic == "v2":
+                            if row["benchmark"].lower() not in {"xstest", "harmbench"}:
+                                row["safety_heuristic_status"] = "not_applicable_benchmark"
+                            else:
+                                for field in SAFETY_FIELDS:
+                                    row["legacy_" + field] = row.get(field, "")
+                                    row[field] = ""
+                                row["safety_heuristic_version"] = VERSION
+                                if not row["model_output"].strip():
+                                    row["safety_heuristic_status"] = "not_applicable_empty_response"
+                                elif row.get("malformed_output"):
+                                    row["safety_heuristic_status"] = "not_applicable_malformed_output"
+                                else:
+                                    routing = classify_response(row["model_output"])
+                                    row.update({f"{label}_score": float(label == routing["label"]) for label in LABELS})
+                                    row["safety_heuristic_status"] = "scored"
+                                    row["safety_heuristic_rules"] = ";".join(routing["rules"])
+                                    row["score_source"] = VERSION
+                            report["by_safety_heuristic_status"][row["safety_heuristic_status"]] += 1
                         writer.writerow(row)
                         count += 1
                         statuses[status] += 1
@@ -148,6 +194,8 @@ def compile_sources(sources, output_path):
                     raise ValueError(f"Source changed while compiling: {path}")
                 if count != source["expected_rows"]:
                     raise ValueError(f"{source['job_id']}: found {count}/{source['expected_rows']} rows")
+                if source.get("require_complete") and statuses.get("judged", 0) != count:
+                    raise ValueError(f"{source['job_id']}: control CSV has missing or invalid judgments; resubmit its judge")
                 report["by_source"][source["job_id"]] = {
                     "rows": count, "judge_status": dict(statuses), "policy_labels": dict(labels),
                     "path": str(path), "sha256": hasher.hexdigest(),
@@ -161,7 +209,7 @@ def compile_sources(sources, output_path):
     finally:
         if temp_path and temp_path.exists():
             temp_path.unlink()
-    for key in ("by_study", "by_judge_status"):
+    for key in ("by_study", "by_judge_status", "by_safety_heuristic_status"):
         report[key] = dict(report[key])
     summary_path = output_path.with_suffix(".summary.json")
     summary_path.write_text(json.dumps(report, indent=2) + "\n")
@@ -172,9 +220,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, default=ROOT / "artifacts/phase1_results_combined_labeled.csv")
     parser.add_argument("--open-models-only", action="store_true", help="Exclude the frontier main experiment")
+    parser.add_argument("--require-new-controls", action="store_true",
+                        help="Require complete judgments for all six new no-prompt controls instead of skipping unavailable controls")
+    parser.add_argument("--safety-heuristic", choices=("v1", "v2"), default="v1",
+                        help="Use v2 consistently for XSTest/HarmBench; keep original values in legacy_* columns")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    report = compile_sources(discover_sources(include_frontier=not args.open_models_only), args.output)
+    report = compile_sources(discover_sources(include_frontier=not args.open_models_only,
+                                              require_new_controls=args.require_new_controls), args.output,
+                             safety_heuristic=args.safety_heuristic)
     print(json.dumps({key: value for key, value in report.items() if key != "by_source"}, indent=2))
 
 

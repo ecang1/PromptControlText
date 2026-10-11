@@ -39,6 +39,9 @@
 #   GENERATION_MAX_WORKERS  client concurrency (DeepSeek: 16; others: 64)
 #   VLLM_MAX_NUM_SEQS       server concurrency (DeepSeek: 32; others: 512)
 #   VLLM_MAX_NUM_BATCHED_TOKENS  prefill budget (DeepSeek: 4096; others: 32768)
+#   REGISTRY_VERSION       v3 (default) or control (one no-system condition)
+#   OUTPUT_FILE            defaults to a separate file for each registry
+#   SAFETY_ONLY=1          generate only XSTest/HarmBench (850 control items)
 # Existing generation checkpoints are resumed; completed responses are kept.
 # =============================================================================
 
@@ -49,6 +52,13 @@ set -eo pipefail
 : "${TENSOR_PARALLEL_SIZE:?TENSOR_PARALLEL_SIZE must be set}"
 : "${MAX_MODEL_LEN:=8192}"
 : "${GPU_MEMORY_UTILIZATION:=0.92}"
+: "${REGISTRY_VERSION:=v3}"
+case "$REGISTRY_VERSION" in
+    v3) DEFAULT_OUTPUT="artifacts/phase1_results_${MODEL_SLUG}.csv" ;;
+    control) DEFAULT_OUTPUT="artifacts/phase1_results_control_${MODEL_SLUG}.csv" ;;
+    *) echo "ERROR: REGISTRY_VERSION must be v3 or control"; exit 1 ;;
+esac
+OUTPUT_FILE="${OUTPUT_FILE:-$DEFAULT_OUTPUT}"
 
 echo "=========================================="
 echo "Prompt Control Pipeline ($MODEL_DIR_NAME)"
@@ -73,7 +83,12 @@ fi
 
 SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-$(basename "$MODEL_DIR_NAME")}"
 CONDA_ENV="${CONDA_ENV:-PromptControlText}"
-VLLM_PORT=8000
+if [ "$REGISTRY_VERSION" = control ]; then
+    # Several small jobs can share a node, so each needs its own server port.
+    VLLM_PORT="${VLLM_PORT:-$((20000 + ${SLURM_JOB_ID:-0} % 30000))}"
+else
+    VLLM_PORT="${VLLM_PORT:-8000}"
+fi
 source "$PROJECT_DIR/slurm/model_runtime.sh"
 
 # ------------------------------------------------------------------
@@ -130,7 +145,7 @@ if [ -z "$CUDA_VISIBLE_DEVICES" ]; then
     CUDA_VISIBLE_DEVICES=$(seq -s, 0 $((TENSOR_PARALLEL_SIZE - 1)))
 fi
 export CUDA_VISIBLE_DEVICES
-export OMP_NUM_THREADS=8
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
 export TOKENIZERS_PARALLELISM=true
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export NCCL_P2P_LEVEL=NVL
@@ -239,14 +254,20 @@ fi
 # 8. Run Evaluation Pipeline
 # ------------------------------------------------------------------
 echo "=========================================="
-echo "Phase 1: XSTest + HarmBench + IHEval (resume)"
+echo "Phase 1: XSTest + HarmBench + IHEval ($REGISTRY_VERSION, resume)"
+echo "Output: $OUTPUT_FILE"
 echo "=========================================="
+GENERATION_EXTRA_ARGS=()
+if [ "${SAFETY_ONLY:-0}" = 1 ]; then
+    GENERATION_EXTRA_ARGS+=(--safety-only)
+fi
 python -m experiments.run_phase1 \
     --generator-model    "$SERVED_MODEL_NAME" \
-    --output-file        "artifacts/phase1_results_${MODEL_SLUG}.csv" \
+    --base-url           "http://localhost:${VLLM_PORT}/v1" \
+    --output-file        "$OUTPUT_FILE" \
     --data-dir           "$PROJECT_DIR/benchmarks/artifacts/datasets" \
-    --registry-version   v3 \
+    --registry-version   "$REGISTRY_VERSION" \
     --max-workers        "$GENERATION_MAX_WORKERS" \
-    --resume
+    --resume "${GENERATION_EXTRA_ARGS[@]}"
 
 echo "✅ Job completed at $(date)"
