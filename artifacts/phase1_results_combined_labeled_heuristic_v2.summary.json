@@ -1,6 +1,6 @@
 {
   "output": "artifacts/phase1_results_combined_labeled_heuristic_v2.csv",
-  "total_rows": 2450830,
+  "total_rows": 2455930,
   "by_source": {
     "phase1_qwen25_72b": {
       "rows": 242640,
@@ -256,6 +256,91 @@
       "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/phase1_deepseek_r1_distill_llama_70b/labeled.csv",
       "sha256": "d0986b0f37fbe196c2a411e3523308e38964a2e0e20df5d2d6a52fa8d3e71dbf"
     },
+    "control_gemma4_12b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "refusal": 421,
+        "compliance": 399,
+        "safe_redirection": 16,
+        "clarification": 14
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_gemma4_12b/labeled.csv",
+      "sha256": "bf86e64e297d30085a88d19afc72cef4ca5321885cc521d441996945bf036c2c"
+    },
+    "control_gemma4_31b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "refusal": 412,
+        "compliance": 408,
+        "clarification": 11,
+        "safe_redirection": 19
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_gemma4_31b/labeled.csv",
+      "sha256": "860f13572acaf91a304cba79cebc49b4e0f2c5740db8b23724cba5a1b3f3d9a9"
+    },
+    "control_qwen3_6_35b_a3b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "refusal": 134,
+        "safe_redirection": 159,
+        "compliance": 528,
+        "clarification": 28,
+        "hierarchy_preservation": 1
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_qwen3_6_35b_a3b/labeled.csv",
+      "sha256": "915dce6518d851252af91d56814b3d044b0ce43fe549f3d27e7f2578e0cfd19f"
+    },
+    "control_nemotron_3_nano_4b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "safe_redirection": 156,
+        "refusal": 458,
+        "compliance": 147,
+        "clarification": 89
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_nemotron_3_nano_4b/labeled.csv",
+      "sha256": "ff64deb112e79c4f315d871e3b367f5ea29fb3c68a179bc82a1df54452baec25"
+    },
+    "control_deepseek_r1_distill_qwen_32b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "compliance": 428,
+        "clarification": 270,
+        "refusal": 124,
+        "safe_redirection": 28
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_deepseek_r1_distill_qwen_32b/labeled.csv",
+      "sha256": "60241f69f0f2aa8b1e11f270d1cfbbaef2c22ed2b4fb1013b361be1caf91131f"
+    },
+    "control_deepseek_r1_distill_llama_70b": {
+      "rows": 850,
+      "judge_status": {
+        "judged": 850
+      },
+      "policy_labels": {
+        "compliance": 421,
+        "clarification": 245,
+        "refusal": 142,
+        "safe_redirection": 42
+      },
+      "path": "/Users/mg9965/Library/CloudStorage/Box-Box/ResearchProjects/LLM/promptControlText/artifacts/llm_policy_labels/control_deepseek_r1_distill_llama_70b/labeled.csv",
+      "sha256": "73d429f02caf381d7f9c0ed0e1e3887816b228010d614b89b6cd1db2f660935a"
+    },
     "frontier_main": {
       "rows": 10950,
       "judge_status": {
@@ -276,18 +361,18 @@
     }
   },
   "by_study": {
-    "open_models": 2439880,
+    "open_models": 2444980,
     "frontier_main": 10950
   },
   "by_judge_status": {
-    "judged": 2439343,
+    "judged": 2444443,
     "invalid_judgment": 10942,
     "missing_judgment": 35,
     "not_applicable_empty_provider_block": 510
   },
   "safety_heuristic": "v2",
   "by_safety_heuristic_status": {
-    "scored": 623692,
+    "scored": 628792,
     "not_applicable_benchmark": 1826670,
     "not_applicable_empty_response": 468
   },

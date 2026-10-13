@@ -361,6 +361,20 @@ boundary_rates
 # color = prompt family
 # shape = model
 # ============================================================
+
+# --------------------------------------------------------
+# Shared behavioral policy colors
+# --------------------------------------------------------
+
+policy_colors <- c(
+  "Compliance"    = "#2EAF4A",  # green
+  "Refusal"       = "#D64545",  # red
+  "Clarification" = "#4D80FA",  # blue
+  "Hierarchy"     = "#19ABB4",  # teal
+  "Source"        = "#A85CF2",  # purple
+  "Safe Help"     = "#F2A93B"   # orange
+)
+
 # Main analysis dataset
 analysis_df <- df %>%
   filter(!malformed)
@@ -573,7 +587,7 @@ policy_family_df <- analysis_df %>%
 p_policy_family <- policy_family_df %>%
   ggplot(aes(x = prompt_family_short, y = prop, fill = llm_policy_label)) +
   geom_col(width = 0.75) +
-  facet_wrap(~ model_name) +
+  facet_wrap(~ model_name, ncol = 4) +
   coord_flip() +
   scale_y_continuous(labels = percent_format(accuracy = 1)) +
   labs(
@@ -581,46 +595,153 @@ p_policy_family <- policy_family_df %>%
     y = "Share of responses",
     fill = "Behavioral Policy"
   ) +
-    theme_minimal() +
-    theme(
-      panel.grid.major = element_blank(),
-      panel.grid.minor = element_blank(),
-      axis.line = element_line(
-        colour = "black",
-        linewidth = 2,
-        linetype = "solid"
-      ),
-      legend.key.size = unit(1.3, "cm"),
-      legend.text = element_text(size = 26),
-      axis.text = element_text(size = 26),
-      axis.title = element_text(size = 34),
-      plot.title = element_text(
-        size = 26,
-        face = "bold",
-        hjust = 0.5
-      ),
-      legend.title = element_blank(),
-       strip.text = element_text(
-    size = 28,
-    face = "bold"
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 2,
+      linetype = "solid"
+    ),
+    axis.text = element_text(size = 26),
+    axis.title = element_text(size = 34),
+    plot.title = element_text(
+      size = 26,
+      face = "bold",
+      hjust = 0.5
+    ),
+    strip.text = element_text(
+      size = 28,
+      face = "bold"
+    ),
+    legend.position = "inside",
+    legend.position.inside = c(0.65, 0.12),
+    legend.justification = c(0.5, 0.5),
+    legend.direction = "horizontal",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 26),
+    legend.key.size = unit(1.3, "cm"),
+    legend.background = element_blank()
+  ) +
+  guides(
+    fill = guide_legend(
+      ncol = 3,
+      byrow = TRUE
+    )
+  ) +
+  scale_fill_manual(
+    values = policy_colors,
+    breaks = names(policy_colors)
   )
-    ) +
-    guides(
-      color = guide_legend(
-        override.aes = list(
-          shape = 16,
-          size = 7,
-          alpha = 1,
-          linewidth = 0
-        )
-      ),
-      linetype = guide_legend(
-        override.aes = list(linewidth = 3)
+
+p_policy_family
+
+# --------------------------------------------------------
+# Calculate policy proportions within each model
+# --------------------------------------------------------
+
+policy_family_model_df <- analysis_df %>%
+  filter(
+    !is.na(llm_policy_label),
+    llm_policy_label != "parse_error",
+    !is.na(prompt_family_short),
+    prompt_family_short != "No Prompt"
+  ) %>%
+  mutate(
+    llm_policy_label = as.character(llm_policy_label),
+    prompt_family_short = factor(
+      prompt_family_short,
+      levels = c(
+        "Answer",
+        "Refuse",
+        "Clarify",
+        "Evidence",
+        "Hierarchy",
+        "Safe Help",
+        "Source",
+        "Transform"
       )
     )
+  ) %>%
+  count(model_name, prompt_family_short, llm_policy_label, name = "n") %>%
+  complete(
+    nesting(model_name, prompt_family_short),
+    llm_policy_label,
+    fill = list(n = 0)
+  ) %>%
+  group_by(model_name, prompt_family_short) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
 
- p_policy_family
+# --------------------------------------------------------
+# Average proportions across models
+# --------------------------------------------------------
 
+policy_family_avg_df <- policy_family_model_df %>%
+  group_by(prompt_family_short, llm_policy_label) %>%
+  summarise(
+    prop = mean(prop, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --------------------------------------------------------
+# Plot average behavioral policy distributions
+# --------------------------------------------------------
+
+p_policy_family <- policy_family_avg_df %>%
+  ggplot(aes(
+    x = prompt_family_short,
+    y = prop,
+    fill = llm_policy_label
+  )) +
+  geom_col(width = 0.75) +
+  coord_flip() +
+  scale_y_continuous(
+    labels = percent_format(accuracy = 1),
+    limits = c(0, 1),
+    expand = expansion(mult = c(0, 0))
+  ) +
+  scale_fill_manual(
+    values = policy_colors,
+    breaks = names(policy_colors)
+  ) +
+  labs(
+    x = NULL,
+    y = "Mean Share of Responses Across Models",
+    fill = "Behavioral Policy"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 2,
+      linetype = "solid"
+    ),
+    axis.text = element_text(size = 26),
+    axis.title = element_text(size = 34),
+    plot.title = element_text(
+      size = 26,
+      face = "bold",
+      hjust = 0.5
+    ),
+    legend.position = "right",
+legend.direction = "vertical",
+legend.title = element_blank(),
+legend.text = element_text(size = 24),
+legend.key.size = unit(1.2, "cm"),
+legend.background = element_blank()
+  ) +
+  guides(
+  fill = guide_legend(
+    ncol = 1,
+    byrow = TRUE
+  )
+)
+
+p_policy_family
 # ============================================================
 # PLOT 3: Aggregate effect of clarity on the safety boundary
 # one point per clarity level
@@ -704,6 +825,7 @@ y_max <- max(
 ) * 1.20
 
 
+# change to bars
 p_boundary_clarity_agg <- ggplot() +
 
   # ----------------------------------------------------------
@@ -818,6 +940,10 @@ p_boundary_clarity_agg <- ggplot() +
         linewidth = 0
       )
     )
+  ) +
+  scale_fill_manual(
+    values = policy_colors,
+    breaks = names(policy_colors)
   )
 
 p_boundary_clarity_agg
@@ -858,11 +984,11 @@ p_policy_clarity <- policy_clarity_df %>%
     legend.text = element_text(size = 26),
     legend.title = element_blank(),
 
-    axis.text = element_text(size = 26),
+    axis.text = element_text(size = 24),
     axis.title = element_text(size = 34),
 
     plot.title = element_text(
-      size = 26,
+      size = 23,
       face = "bold",
       hjust = 0.5
     ),
@@ -879,6 +1005,126 @@ p_policy_clarity <- policy_clarity_df %>%
         linewidth = 0
       )
     )
+  ) +
+  scale_fill_manual(
+    values = policy_colors,
+    breaks = names(policy_colors)
+  )
+p_policy_clarity
+
+
+# --------------------------------------------------------
+# Calculate policy proportions within each model
+# --------------------------------------------------------
+
+policy_clarity_model_df <- analysis_df %>%
+  filter(
+    !is.na(llm_policy_label),
+    llm_policy_label != "parse_error"
+  ) %>%
+  mutate(
+    clarity_short = case_when(
+      clarity_level == "vague" ~ "Vague",
+      clarity_level == "explicit" ~ "Explicit",
+      clarity_level == "explicit-fallback" ~ "Explicit + Fallback",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(clarity_short)) %>%
+  mutate(
+    clarity_short = factor(
+      clarity_short,
+      levels = c(
+        "Explicit + Fallback",
+        "Explicit",
+        "Vague"
+      )
+    ),
+    llm_policy_label = as.character(llm_policy_label)
+  ) %>%
+  count(model_name, clarity_short, llm_policy_label, name = "n") %>%
+  complete(
+    nesting(model_name, clarity_short),
+    llm_policy_label,
+    fill = list(n = 0)
+  ) %>%
+  group_by(model_name, clarity_short) %>%
+  mutate(prop = n / sum(n)) %>%
+  ungroup()
+
+# --------------------------------------------------------
+# Average proportions across models
+# --------------------------------------------------------
+
+policy_clarity_avg_df <- policy_clarity_model_df %>%
+  group_by(clarity_short, llm_policy_label) %>%
+  summarise(
+    prop = mean(prop, na.rm = TRUE),
+    .groups = "drop"
+  )
+# ------------------------------------------
+# Plot average behavioral policy distributions
+# --------------------------------------------------------
+
+p_policy_clarity <- policy_clarity_avg_df %>%
+  ggplot(aes(
+    x = clarity_short,
+    y = prop,
+    fill = llm_policy_label
+  )) +
+
+  geom_col(width = 0.75) +
+
+  coord_flip() +
+
+  scale_y_continuous(
+    labels = percent_format(accuracy = 1),
+    limits = c(0, 1),
+    expand = expansion(mult = c(0, 0))
+  ) +
+
+  labs(
+    x = NULL,
+    y = "Mean Share of Responses Across Models",
+    fill = "Behavioral Policy"
+  ) +
+
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 2,
+      linetype = "solid"
+    ),
+
+    legend.key.size = unit(1.3, "cm"),
+    legend.text = element_text(size = 26),
+    legend.title = element_blank(),
+
+    axis.text = element_text(size = 24),
+    axis.title = element_text(size = 34),
+
+    plot.title = element_text(
+      size = 23,
+      face = "bold",
+      hjust = 0.5
+    )
+  ) +
+
+  guides(
+    fill = guide_legend(
+      override.aes = list(
+        alpha = 1,
+        linewidth = 0
+      )
+    )
+  ) +
+  scale_fill_manual(
+    values = policy_colors,
+    breaks = names(policy_colors)
   )
 
 p_policy_clarity
@@ -961,6 +1207,7 @@ df %>%
 df %>%
   count(model_name, prompt_family, clarity_level, benchmark)
 ```
+
 ```{r, echo=FALSE}
 # ============================================================
 # 1A. Does prompt family change classified policy?
@@ -2954,7 +3201,7 @@ p_roc_by_model <- ggplot() +
   theme(
     legend.title = element_blank(),
 
-    text = element_text(size = 30),
+    text = element_text(size = 26),
 
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
@@ -2968,7 +3215,7 @@ p_roc_by_model <- ggplot() +
     legend.key.size = unit(2, "cm"),
 
     # Smaller axis labels within each facet
-    axis.text = element_text(size = 30),
+    axis.text = element_text(size = 26),
 
     # Model name and d'
     strip.text = element_text(
@@ -3025,6 +3272,237 @@ p_roc_by_model
 # )
 
 # Need bar graph that shows difference between criterion and discriminability 
+# --------------------------------------------------------
+# Mean SDT estimates within each model and clarity level
+# --------------------------------------------------------
+
+clarity_model_means <- sdt_df %>%
+  filter(
+    prompt_family_short != "No Prompt",
+    clarity_level %in% c("vague", "explicit", "explicit-fallback")
+  ) %>%
+  group_by(model_name, clarity_level) %>%
+  summarise(
+    d_prime = mean(d_prime, na.rm = TRUE),
+    criterion = mean(criterion, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# --------------------------------------------------------
+# Calculate changes relative to Vague, within each model
+# --------------------------------------------------------
+
+vague_reference <- clarity_model_means %>%
+  filter(clarity_level == "vague") %>%
+  select(
+    model_name,
+    vague_dprime = d_prime,
+    vague_criterion = criterion
+  )
+
+clarity_changes <- clarity_model_means %>%
+  filter(clarity_level != "vague") %>%
+  inner_join(vague_reference, by = "model_name") %>%
+  mutate(
+    delta_dprime = d_prime - vague_dprime,
+    delta_criterion = criterion - vague_criterion,
+    clarity_short = factor(
+      clarity_level,
+      levels = c("explicit", "explicit-fallback"),
+      labels = c("Explicit", "Explicit + Fallback")
+    )
+  ) %>%
+  pivot_longer(
+    cols = c(delta_dprime, delta_criterion),
+    names_to = "metric",
+    values_to = "change"
+  ) %>%
+  mutate(
+    metric = factor(
+      metric,
+      levels = c("delta_dprime", "delta_criterion"),
+      labels = c("Discriminability (d')", "Response Criterion (c)")
+    )
+  )
+
+# --------------------------------------------------------
+# 95% confidence intervals across paired model differences
+# --------------------------------------------------------
+
+clarity_changes_summary <- clarity_changes %>%
+  group_by(clarity_short, metric) %>%
+  summarise(
+    mean = mean(change, na.rm = TRUE),
+    n = sum(!is.na(change)),
+    se = sd(change, na.rm = TRUE) / sqrt(n),
+    ci_low = mean - qt(0.975, n - 1) * se,
+    ci_high = mean + qt(0.975, n - 1) * se,
+    .groups = "drop"
+  )
+
+# --------------------------------------------------------
+# Plot changes relative to Vague
+# --------------------------------------------------------
+
+
+#clarity 
+p_boundary_clarity_agg <- ggplot() +
+  geom_hline(
+    yintercept = 0,
+    color = "grey50",
+    linewidth = 1.2
+  ) +
+  geom_col(
+    data = clarity_changes_summary,
+    aes(x = clarity_short, y = mean, fill = clarity_short),
+    width = 0.65,
+    color = "black",
+    alpha = 0.7
+  ) +
+  geom_linerange(
+    data = clarity_changes_summary,
+    aes(x = clarity_short, ymin = ci_low, ymax = ci_high),
+    linewidth = 2.5,
+    color = "black"
+  ) +
+  geom_point(
+    data = clarity_changes,
+    aes(x = clarity_short, y = change),
+    position = position_jitter(width = 0.10, height = 0),
+    color = "black",
+    size = 3.5,
+    alpha = 0.6
+  ) +
+  facet_wrap(~ metric, scales = "free_y", nrow = 1) +
+  scale_fill_manual(
+    values = c(
+      "Explicit" = "#5AC66A",
+      "Explicit + Fallback" = "#85A9FA"
+    )
+  ) +
+  labs(
+    x = NULL,
+    y = "Change relative to Vague (SDT units)"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 2
+    ),
+    axis.text = element_text(size = 26),
+    axis.title = element_text(size = 34),
+    strip.text = element_text(size = 28, face = "bold"),
+    legend.position = "none"
+  )
+
+p_boundary_clarity_agg
+
+# pooled np2
+# --------------------------------------------------------
+# Extract pooled partial eta-squared from Type II ANOVAs
+# --------------------------------------------------------
+
+extract_pooled_eta <- function(model, metric) {
+
+  anova_df <- as.data.frame(car::Anova(model, type = 2))
+
+  ss_error <- anova_df["Residuals", "Sum Sq"]
+
+  tibble(
+    term = rownames(anova_df),
+    eta_p2 = anova_df[["Sum Sq"]] /
+      (anova_df[["Sum Sq"]] + ss_error),
+    metric = metric
+  ) %>%
+    filter(term %in% c("prompt_family_short", "clarity_level"))
+}
+
+sdt_pooled_effects <- bind_rows(
+  extract_pooled_eta(m_dprime, "Discriminability (d')"),
+  extract_pooled_eta(m_criterion, "Response Criterion (c)")
+) %>%
+  mutate(
+    effect = factor(
+      term,
+      levels = c("prompt_family_short", "clarity_level"),
+      labels = c("Prompt Family", "Prompt Clarity")
+    ),
+    metric = factor(
+      metric,
+      levels = c(
+        "Discriminability (d')",
+        "Response Criterion (c)"
+      )
+    )
+  )
+
+# --------------------------------------------------------
+# Plot pooled effect sizes
+# --------------------------------------------------------
+
+p_sdt_pooled_effect_sizes <- ggplot(
+  sdt_pooled_effects,
+  aes(x = effect, y = eta_p2, fill = metric)
+) +
+
+  geom_col(
+    position = position_dodge(width = 0.8),
+    width = 0.7,
+    color = "black",
+    alpha = 0.8
+  ) +
+
+  geom_text(
+    aes(label = sprintf("%.3f", eta_p2)),
+    position = position_dodge(width = 0.8),
+    vjust = -0.5,
+    size = 9
+  ) +
+
+  scale_fill_manual(
+    values = c(
+      "Discriminability (d')" = "#85A9FA",
+      "Response Criterion (c)" = "#F58F8B"
+    )
+  ) +
+
+  scale_y_continuous(
+    limits = c(0, 0.35),
+    breaks = seq(0, 0.35, by = 0.05),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+
+  labs(
+    x = NULL,
+    y = expression("Partial " * eta[p]^2),
+    fill = NULL
+  ) +
+
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(
+      colour = "black",
+      linewidth = 2,
+      linetype = "solid"
+    ),
+    axis.text = element_text(size = 26),
+    axis.title = element_text(size = 34),
+    legend.text = element_text(size = 26),
+    legend.key.size = unit(1.3, "cm"),
+    legend.position = "top",
+    plot.title = element_text(
+      size = 26,
+      face = "bold",
+      hjust = 0.5
+    )
+  )
+
+p_sdt_pooled_effect_sizes
 
 ```
 
