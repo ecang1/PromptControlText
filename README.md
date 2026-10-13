@@ -10,9 +10,15 @@ audit needed to validate its LLM judge. Historical v1/v2 studies,
 response-mining prototypes, duplicate IHEval runs, smoke jobs, and launchers
 for models outside the paper have been removed.
 
+The original study and reported findings are retained below. The October 2026
+revision adds new open-model runs and controls, a separate three-provider
+frontier extension, and additional scoring, analysis, and human-validation
+tools. See [Revision updates](#revision-updates-october-2026) for the current
+data snapshot and its limitations.
+
 ## Study overview
 
-The experiment held each benchmark item fixed while varying the surrounding
+The original experiment held each benchmark item fixed while varying the surrounding
 system prompt. The full crossed design was:
 
 - 8 prompt families
@@ -27,7 +33,7 @@ responses (`3,370 x 73 x 4`).
 
 ## Benchmarks
 
-All selected items were used without subsampling.
+All selected items in the original experiment were used without subsampling.
 
 | Benchmark | Items | Role in the study |
 |---|---:|---|
@@ -98,9 +104,10 @@ slurm/run_prompt_controllers_72b.sh
 ```
 
 The corresponding no-prompt jobs are the four scripts under `slurm/control/`.
-For the six new open models, submit the missing no-prompt controls and their
-dependent judges with `bash slurm/submit_new_controls.sh`. These run one condition
-per item and use shorter job limits; see [new model baselines](docs/new-model-baselines.md).
+The six new open models now also have completed safety-only no-prompt controls
+and judgments. To reproduce or resume these jobs, use
+`bash slurm/submit_new_controls.sh`. These run one condition per XSTest/HarmBench
+item and use shorter job limits; see [new model baselines](docs/new-model-baselines.md).
 
 ## Behavioral judging
 
@@ -130,6 +137,11 @@ cases were flagged for human audit.
 to judge only the six new prompted runs, using the same Llama-3.1-8B judge
 and rubric. It requests 24 hours per array task and rejects incomplete or
 empty generation inputs before starting the server.
+
+Saved outputs now exist for all six new prompted runs, including both DeepSeek
+models. The commands below remain available for reproduction or interrupted
+jobs; row processing alone does not establish that every saved judgment is
+valid. The revision summary below records the remaining invalid/missing labels.
 
 ```bash
 # Four complete new runs: Gemma 12B, Gemma 31B, Qwen 3.6, Nemotron Nano.
@@ -204,6 +216,16 @@ The dashboard's original annotation taxonomy is unchanged so that future
 article-revision work can build on it without silently altering prior audit
 decisions.
 
+The revision also preserves a separate six-policy, response-only interface in
+`audit/frontier/`. It adds independent first-pass saves, confidence, supporting
+evidence, an uncertainty flag, and separate adjudication. The
+[annotator guide](docs/frontier-audit/ANNOTATOR_GUIDE.md) and
+[coordinator guide](docs/frontier-audit/COORDINATOR.md) document deterministic
+practice/representative/targeted sampling and agreement/error analysis with
+sampling weights and uncertainty clustered by benchmark item or parent.
+These are preparation tools, not completed human validation; annotators,
+calibration, the final audit design, and independent ratings remain necessary.
+
 ## Analysis methods
 
 The original analysis is preserved in `analysis/analysis.Rmd`. It reads
@@ -253,6 +275,9 @@ claims, although the original notebook retains exploratory mixed-effects code.
 
 ## Main findings
 
+These are the original manuscript's reported findings. They have not been
+replaced here with estimates from the expanded revision dataset.
+
 - 23.98% of prompted item-model responses changed policy relative to the
   matching no-prompt baseline.
 - The nonlinear exponential frontier fit the harmful-compliance/false-refusal
@@ -273,13 +298,110 @@ claims, although the original notebook retains exploratory mixed-effects code.
   (`chi-square(120) = 60201`, `V = .11`). Fallback rules did not act as a
   uniform amplifier; their effect depended on the prompt family.
 
+## Revision updates (October 2026)
+
+The checked-in revision snapshot adds six open models: Gemma 4 12B, Gemma 4 31B,
+Qwen 3.6 35B-A3B, Nemotron 3 Nano 4B, DeepSeek-R1-Distill-Qwen-32B, and
+DeepSeek-R1-Distill-Llama-70B. Each prompted run covers all 3,370 original items
+under 72 interventions. Each new control run covers the 850 XSTest/HarmBench
+items with no system prompt; these controls do not cover IHEval.
+
+### Completed frontier generation and judging
+
+The frontier extension uses a frozen, reproducible sample of 50 items shared
+across three providers and all 73 conditions: **10,950 main cases**. The sample
+contains 20 safe and 10 unsafe XSTest items, 10 HarmBench items, and five aligned
+and five conflict IHEval items. A disjoint 10-item, five-condition pilot
+accounted for another 150 cases and is excluded from the main analysis.
+
+| Provider / requested generator | Main cases | Judged nonempty responses | Empty provider blocks |
+|---|---:|---:|---:|
+| OpenAI `gpt-6-astra` | 3,650 | 3,650 | 0 |
+| Anthropic `claude-opus-5-5` | 3,650 | 3,181 | 469 |
+| Google `gemini-3.1-pro-preview` | 3,650 | 3,609 | 41 |
+| **Total** | **10,950** | **10,440** | **510** |
+
+Generation is complete, the records were retrieved and verified against the
+frozen request identities and hashes, and worker cleanup is recorded. The
+[main archive](artifacts/frontier/runs/2026-10-08-main/) retains raw provider
+results, normalized responses, checkpoint metadata, cost reservations, and
+execution provenance. API credentials and private account configuration are
+excluded. The ledger preserves uncertain charges; its accounted totals are not
+final provider invoices.
+
+The extension restores HarmBench contextual passages and IHEval task-system
+instructions and references. IHEval controls retain the task system while
+omitting the experimental intervention; XSTest/HarmBench controls omit the
+system field. The APIs used low reasoning effort and a 4,096-token output limit,
+so this is a separate extension rather than a temperature-zero replication of
+the original open models. See the [frozen protocol](docs/frontier-experiment.md)
+and [main configuration](configs/frontier-main.json). Analyze the repaired
+context and 50-item sample separately from historical context-incomplete runs;
+they do not support unrestricted benchmark-wide rankings.
+
+All 10,440 nonempty responses now have valid output-only judgments from the
+same Llama-3.1-8B-Instruct judge, using A/B/C first passes and adjudication.
+The [OpenAI](artifacts/llm_policy_labels/frontier_main_openai/manifest.json),
+[Anthropic](artifacts/llm_policy_labels/frontier_main_anthropic/manifest.json),
+and [Google](artifacts/llm_policy_labels/frontier_main_google/manifest.json)
+manifests record complete coverage. Request-ID and response-hash checks preserve
+distinct requests even when their answer text is identical. Empty provider
+blocks retain blank policy labels; a provider block containing text is still
+judged. Policy labels, transport outcomes, and native benchmark correctness are
+separate endpoints.
+
+### Combined data and revision analysis
+
+The [saved compilation summary](artifacts/phase1_results_combined_labeled.summary.json)
+accounts for **2,455,930 rows across 13 generator models**:
+
+| Source | Rows |
+|---|---:|
+| Four original open models, prompted and controls | 984,040 |
+| Six additional open models, prompted | 1,455,840 |
+| Six additional safety-only controls | 5,100 |
+| Frontier main, including empty provider blocks | 10,950 |
+
+The compiler retains `source_run`, `analysis_study`, `model_cohort`, and
+`judge_status`, with source hashes and coverage checks. The saved summary still
+contains **10,942 invalid and 35 missing judgments** in the older/open-model
+runs; these remain explicit rather than being assigned inferred policy labels.
+All six new safety controls and the frontier text responses have valid labels.
+
+The revision adds an opt-in [CPU-only refusal scorer](docs/heuristic-scoring.md)
+and [comparison audits](docs/scorer-comparisons.md) against published human
+annotations, saved graders, and native IHEval checks. Lexical refusal,
+harmful-behavior success, task correctness, and six-policy classification are
+different targets: non-refusal alone is not evidence of harmful compliance.
+The scorer's internal holdout results do not replace independent human
+validation on the current study.
+
+To reproduce the saved v2 compilation offline from the downloaded artifacts:
+
+```bash
+python -m scoring.compile_results --safety-heuristic v2 --require-new-controls
+```
+
+`analysis/analysis.Rmd` retains all compiled rows in `all_data` and selects the
+analysis cohort separately with `PROMPT_CONTROL_STUDY` (`open_models` or
+`frontier_main`). It also contains signal-detection analysis of refusal:
+unsafe-request refusals are hits, safe-request refusals are false alarms, and
+loglinear correction supports finite d-prime and criterion estimates.
+See the [compilation runbook](docs/compiling-results.md) for loading and study
+selection. Independent human validation, review of unresolved judgments,
+revision-specific figures/results, and final manuscript integration remain
+separate from generation and compilation completion.
+
 ## Repository map
 
 ```text
 benchmarks/                         Paper benchmark loaders and snapshots
 configs/llm_policy_jobs.yaml        Eight final judge jobs
+configs/llm_policy_jobs_new_models.yaml  Six additional prompted judge jobs
+configs/llm_policy_jobs_new_controls.yaml  Six safety-control judge jobs
 core/schema.py                      Shared evaluation-item schema
 experiments/run_phase1.py           Full crossed generation experiment
+frontier/                           Hosted API generation and judge handoff
 models/vllm_client.py               Reproducible vLLM request settings
 prompts/registry_v3.yaml            Frozen 8 x 3 x 3 prompt registry
 prompts/registry_control.yaml       No-system-prompt baseline
@@ -288,13 +410,15 @@ slurm/                              Four model, four control, and judge jobs
 analysis/analysis.Rmd               Original paper analysis
 analysis/figures/                   Paper figures
 audit/                              Human-audit dashboard and support modules
+audit/frontier/                     Six-policy response-only audit tools
+docs/                              Protocols, scoring and revision runbooks
 artifacts/                          Raw runs, judge outputs, and combined data
 tests/                              Tests for the retained paper pipeline
 ```
 
 ## Setup and verification
 
-For the planned frontier-model extension, see
+For the frontier-model extension's credential configuration, see
 [credential setup](docs/credential-setup.md). Actual API keys belong only in the
 Git-ignored local `.env`; the blank `.env.example` is safe to commit.
 
@@ -311,10 +435,13 @@ All four pilot workers are deleted. The main experiment is now uploaded under
 The [frontier cluster judging runbook](docs/frontier-judging.md) explains how to
 prepare its 10,440 nonempty answers, submit the three-provider judge array,
 resume interrupted jobs, and rejoin all cases while retaining 510 empty provider
-blocks separately. Judging has not yet been submitted.
+blocks separately. All three frontier judge manifests now report completion;
+the revision summary above records the current coverage.
 
 See the [revision status report and checklist](docs/revision-status-2026-10-07.md)
-for completed work, budget accounting, missing inputs, and remaining tasks.
+for the original revision task list and historical budget/decision records.
+Its launch-era status text predates the completed generation and judging
+summarized above.
 
 Git LFS is required for the large CSV artifacts.
 
