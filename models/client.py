@@ -13,18 +13,38 @@ class LLMClient:
         self.enable_cache = enable_cache
         self.cache: Dict[str, str] = {}
         
-    def _get_cache_key(self, system_prompt: str, user_prompt: str, model: str, temperature: float) -> str:
-        key_content = f"{system_prompt}|{user_prompt}|{model}|{temperature}"
+    def _get_cache_key(
+        self, system_prompt: str, user_prompt: str, model: str,
+        temperature: float, top_p: float, top_k: int,
+        repetition_penalty: float, seed: int, max_tokens: int,
+    ) -> str:
+        key_content = (
+            f"{system_prompt}|{user_prompt}|{model}|{temperature}|{top_p}|"
+            f"{top_k}|{repetition_penalty}|{seed}|{max_tokens}"
+        )
         return hashlib.sha256(key_content.encode('utf-8')).hexdigest()
 
-    def generate(self, system_prompt: str, user_prompt: str, model: str, temperature: float = 0.0) -> Tuple[str, Dict[str, Any]]:
+    def generate(
+        self, system_prompt: str, user_prompt: str, model: str,
+        temperature: float = 0.0, max_tokens: int = 512,
+        top_p: float = 1.0, top_k: int = 0,
+        repetition_penalty: float = 1.05, seed: int = 0,
+    ) -> Tuple[str, Dict[str, Any]]:
         metadata = {
             "model": model,
             "temperature": temperature,
+            "max_tokens": max_tokens,
+            "top_p": top_p,
+            "top_k": top_k,
+            "repetition_penalty": repetition_penalty,
+            "seed": seed,
             "timestamp": time.time(),
         }
 
-        cache_key = self._get_cache_key(system_prompt, user_prompt, model, temperature)
+        cache_key = self._get_cache_key(
+            system_prompt, user_prompt, model, temperature, top_p, top_k,
+            repetition_penalty, seed, max_tokens,
+        )
         if self.enable_cache and cache_key in self.cache:
             return self.cache[cache_key], metadata
 

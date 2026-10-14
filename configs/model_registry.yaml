@@ -10,6 +10,43 @@
 # =============================================================================
 
 models:
+  # Frozen composition_v1 confirmatory generators.
+  - slug: llama31_8b_instruct
+    repo_id: meta-llama/Llama-3.1-8B-Instruct
+    revision: main
+    local_dir_name: meta-llama--Llama-3.1-8B-Instruct
+    allow_patterns: null
+    gated: true
+    tensor_parallel_size: 1
+    gpus: 1
+
+  - slug: llama33_70b_instruct
+    repo_id: meta-llama/Llama-3.3-70B-Instruct
+    revision: main
+    local_dir_name: meta-llama--Llama-3.3-70B-Instruct
+    allow_patterns: null
+    gated: true
+    tensor_parallel_size: 4
+    gpus: 4
+
+  - slug: qwen2_7b_instruct
+    repo_id: Qwen/Qwen2-7B-Instruct
+    revision: main
+    local_dir_name: Qwen--Qwen2-7B-Instruct
+    allow_patterns: null
+    gated: false
+    tensor_parallel_size: 1
+    gpus: 1
+
+  - slug: qwen25_72b_instruct
+    repo_id: Qwen/Qwen2.5-72B-Instruct
+    revision: main
+    local_dir_name: Qwen--Qwen2.5-72B-Instruct
+    allow_patterns: null
+    gated: false
+    tensor_parallel_size: 4
+    gpus: 4
+
   - slug: gemma4_12b
     repo_id: google/gemma-4-12B-it
     revision: main

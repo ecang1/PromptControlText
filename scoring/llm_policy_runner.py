@@ -92,7 +92,7 @@ def _csv_records(path):
         return list(csv.DictReader(stream))
 
 
-def _load_completed_resolutions(judge_votes_path, adj_path, df):
+def _load_completed_resolutions(judge_votes_path, adj_path, df, unresolved_label=None):
     """Restore each request's votes and saved adjudication without LLM calls."""
     from collections import Counter, defaultdict
     from scoring.llm_policy_adjudicate import _needs_adjudication
@@ -128,6 +128,7 @@ def _load_completed_resolutions(judge_votes_path, adj_path, df):
             resolution, _ = resolve_first_pass(
                 row_index=idx, job_id=votes[0].get("job_id", ""), model_output=text,
                 votes=votes, prompts={}, client=None, model="",
+                unresolved_label=unresolved_label,
             )
         else:
             labels = "|".join(v["primary_label"] for v in votes)
@@ -140,20 +141,25 @@ def _load_completed_resolutions(judge_votes_path, adj_path, df):
             panel = [adj.get(f"adjudicator_{i}_label") for i in range(1, 4)]
             resolution = {
                 "llm_policy_label": label, "llm_secondary_label": rep.get("secondary_label"),
-                "llm_confidence": rep["confidence"], "llm_resolution_method": "adjudication",
+                "llm_confidence": 0.0 if label == unresolved_label else rep["confidence"],
+                "llm_resolution_method": "adjudication",
                 "llm_num_agree": Counter(panel)[label], "llm_disagreement_type": "adjudicated",
                 "llm_needs_human_audit": str(adj.get("needs_human_audit", "")).lower() == "true",
-                "llm_evidence": rep.get("evidence", ""), "llm_reason": rep.get("reason", ""),
+                "llm_evidence": "" if label == unresolved_label else rep.get("evidence", ""),
+                "llm_reason": ("Automated adjudication did not reach a majority."
+                               if label == unresolved_label else rep.get("reason", "")),
             }
         resolution["llm_parse_error"] = any(v.get("parse_error") for v in votes) or (
             needs_adj and any(adj.get(f"adjudicator_{i}_label") == "parse_error" for i in range(1, 4))
         )
-        if resolution["llm_policy_label"] in VALID_LABELS:
+        if resolution["llm_policy_label"] in VALID_LABELS or (
+            unresolved_label is not None and resolution["llm_policy_label"] == unresolved_label
+        ):
             completed[idx] = resolution
     return completed
 
 
-def _load_resolution_checkpoint(path, df):
+def _load_resolution_checkpoint(path, df, unresolved_label=None):
     """Replay exact saved resolutions using request identity AND answer hash."""
     from scoring.llm_policy_schema import VALID_LABELS
     if not path.exists():
@@ -185,7 +191,10 @@ def _load_resolution_checkpoint(path, df):
         except ValueError:
             continue
         resolution = saved.get((_identity(row, idx), _row_hash(text)))
-        if resolution and resolution.get("llm_policy_label") in VALID_LABELS:
+        if resolution and (
+            resolution.get("llm_policy_label") in VALID_LABELS
+            or (unresolved_label is not None and resolution.get("llm_policy_label") == unresolved_label)
+        ):
             complete[idx] = resolution
     return complete
 
@@ -266,6 +275,8 @@ def run_job(
     sample_strategy: Optional[str] = None,
     stratify_by: Optional[str] = None,
     require_complete: bool = False,
+    human_audit_sample: bool = True,
+    unresolved_label: Optional[str] = None,
 ) -> None:
     input_path = pathlib.Path(input_path)
     output_dir = pathlib.Path(output_dir)
@@ -306,6 +317,8 @@ def run_job(
 
     settings = {
         "job_id": job_id, "model": model, "temperature": temperature, "max_tokens": max_tokens,
+        "unresolved_label": unresolved_label,
+        "human_audit_sample": human_audit_sample,
         "schema_version": SCHEMA_VERSION,
         "prompt_sha256": {key: _row_hash(value) for key, value in prompts.items()},
     }
@@ -344,9 +357,11 @@ def run_job(
 
     # Resume: skip completed rows and replay their resolutions into all_resolutions
     all_resolutions: Dict[int, Dict] = {}
-    checkpoints = _load_resolution_checkpoint(resolutions_path, df)
+    checkpoints = _load_resolution_checkpoint(resolutions_path, df, unresolved_label)
     if resume:
-        all_resolutions = _load_completed_resolutions(votes_path, adj_path, df)
+        all_resolutions = _load_completed_resolutions(
+            votes_path, adj_path, df, unresolved_label
+        )
         all_resolutions.update(checkpoints)
         logger.info("Replayed %d completed request resolutions.", len(all_resolutions))
 
@@ -411,6 +426,7 @@ def run_job(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            unresolved_label=unresolved_label,
         )
         if "request_id" in row_dict:
             for saved in [*votes, *adj_rows]:
@@ -500,18 +516,24 @@ def run_job(
         result_df["llm_disagreement_type"].value_counts().rename_axis("type").reset_index(name="count").to_csv(
             summary_dis_path, index=False)
 
-    # audit sample
-    try:
-        audit_df = _build_audit_sample(result_df)
-        audit_df.to_csv(audit_path, index=False)
-        logger.info("Audit sample: %d rows.", len(audit_df))
-    except Exception as e:
-        logger.warning("Audit sample failed: %s", e)
+    # Optional human-audit sample. Composition runs disable this and preserve
+    # unresolved rows for a future study instead of creating an audit queue.
+    if human_audit_sample:
+        try:
+            audit_df = _build_audit_sample(result_df)
+            audit_df.to_csv(audit_path, index=False)
+            logger.info("Audit sample: %d rows.", len(audit_df))
+        except Exception as e:
+            logger.warning("Audit sample failed: %s", e)
 
     # manifest
     elapsed = time.time() - t0
     from scoring.llm_policy_schema import VALID_LABELS
     valid_rows = int(result_df["llm_policy_label"].isin(VALID_LABELS).sum())
+    unresolved_rows = int(
+        result_df["llm_policy_label"].eq(unresolved_label).sum()
+    ) if unresolved_label else 0
+    completed_rows = valid_rows + unresolved_rows
     manifest = {
         "job_id": job_id,
         "input": str(input_path),
@@ -523,17 +545,23 @@ def run_job(
         "processed_rows": len(all_resolutions),
         "parse_errors": len(parse_error_rows),
         "valid_labeled_rows": valid_rows,
-        "complete": valid_rows == len(df),
+        "unresolved_rows": unresolved_rows,
+        "human_audit_sample_created": human_audit_sample,
+        "complete": completed_rows == len(df),
         "input_sha256": hashlib.sha256(input_path.read_bytes()).hexdigest(),
         "resume_identity": "request_id" if "request_id" in df.columns else "row_index_and_answer_hash",
         "elapsed_seconds": round(elapsed, 1),
     }
     manifest_path.write_text(json.dumps(manifest, indent=2))
-    logger.info("Job %s finished in %.0fs: %d/%d valid labels.", job_id, elapsed, valid_rows, len(df))
+    logger.info("Job %s finished in %.0fs: %d policy labels, %d unresolved, %d total.",
+                job_id, elapsed, valid_rows, unresolved_rows, len(df))
     logger.removeHandler(fh)
     fh.close()
-    if require_complete and valid_rows != len(df):
-        raise RuntimeError(f"Judge incomplete: {valid_rows}/{len(df)} valid labels; resubmit with --resume")
+    if require_complete and completed_rows != len(df):
+        raise RuntimeError(
+            f"Judge incomplete: {completed_rows}/{len(df)} policy labels or unresolved rows; "
+            "resubmit with --resume"
+        )
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────
@@ -555,6 +583,10 @@ def _parse_args(argv=None):
     p.add_argument("--max-workers", type=int, default=16)
     p.add_argument("--resume", action="store_true")
     p.add_argument("--require-complete", action="store_true", help="Fail if any input lacks a valid policy label")
+    p.add_argument("--no-human-audit-sample", action="store_true",
+                   help="Do not create the stratified audit_sample.csv artifact.")
+    p.add_argument("--unresolved-label", choices=["unresolved"],
+                   help="Store cases without an adjudication majority as unresolved.")
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--sample-strategy", default=None)
     p.add_argument("--stratify-by", default=None)
@@ -582,4 +614,6 @@ if __name__ == "__main__":
         limit=args.limit,
         sample_strategy=args.sample_strategy,
         stratify_by=args.stratify_by,
+        human_audit_sample=not args.no_human_audit_sample,
+        unresolved_label=args.unresolved_label,
     )

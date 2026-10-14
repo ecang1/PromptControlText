@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "experiment": "composition_v1_confirmatory",
+  "status": "generation_protocol_frozen_pending_api_compute",
+  "frozen_at_utc": "2026-10-13T23:07:36Z",
+  "design_scope": "Items, strata, module wording/variants, condition expansion, analysis approach, blind judging protocol, and implementation settings. Generator model set (four checkpoints).",
+  "generation_configuration": {
+    "status": "frozen_pending_api_compute",
+    "config_path": "artifacts/composition_v1_generation_config.json",
+    "config_sha256": "4fc93e0af387ba6addfe00e88a1ae0b9ca7a97e73161dd589737d0d9dad7baa9",
+    "models": [
+      "meta-llama/Llama-3.1-8B-Instruct",
+      "meta-llama/Llama-3.3-70B-Instruct",
+      "Qwen/Qwen2-7B-Instruct",
+      "Qwen/Qwen2.5-72B-Instruct"
+    ],
+    "planned_live_responses_per_model": 4020,
+    "planned_live_responses_total": 16080,
+    "reason": "API access and compute provisioning remain pending."
+  },
+  "manifest_sha256": "8070a0ce464f8249019d363b769dbe92a101491b9cbc11f317bb2b8d98b00ace",
+  "files_sha256": {
+    "artifacts/composition_v1_confirmatory_manifest.json": "8070a0ce464f8249019d363b769dbe92a101491b9cbc11f317bb2b8d98b00ace",
+    "prompts/composition_registry.json": "76f95d302f1bebf5ec53bfae04d6d2a89e6a60be578fcfa7576267789bc06e28",
+    "prompts/composition.py": "f434e856083e25d1211ae17e54dc7d5e2381622998f8363901b94f11eb672dd3",
+    "experiments/run_composition.py": "06f1bb462cbeab9cca2bd2013a2d4ba522b0b7c4662cbb3387e42d17e8a19ce1",
+    "experiments/score_composition.py": "7246aaf2513dab082f4a13760acdf297ec80b5ff0c5f590ced2d2318f39643b2",
+    "docs/compositional-study-design.md": "16e6dc09dd2c2f1b3a05f759fe153a8f91a8ad1dd19f4bc3eeca657ddf509d95",
+    "scoring/llm_policy_judge_prompt_A_v1.txt": "47df5c63b9380835148c293bd9f8df90c8cc57d89662245e0a8cdd7fda288b11",
+    "scoring/llm_policy_judge_prompt_B_v1.txt": "5703ee641c0283018019de2b15fc0cd3e4d0f37d90e303bbd5f4f757cea64233",
+    "scoring/llm_policy_judge_prompt_C_v1.txt": "6b3e696968c20629b216909ca3ece7109482144247a0eb58d1f1d0ab32a825e8",
+    "scoring/llm_policy_adjudicator_prompt_v1.txt": "ce42dea72903b39948268be357dd34bec2f9eea988bbd428a113fe9141785eba",
+    "scoring/llm_policy_prompts.py": "fc7ca3f9f3661f7d69636a1183c94d6ef280be7eea8f5d482a8335f7797f26cf",
+    "scoring/llm_policy_schema_v1.json": "4285ffb2f501f93dee92dad572cc780c8c033491039761d71eff468e1999e665",
+    "scoring/llm_policy_adjudicate.py": "02b62c1e4dc361a61dac2947dac054646d92d8857419fe8944a69e4793d8230c",
+    "scoring/llm_policy_runner.py": "477fdee96db03c43d90e302e476ce6c9899ebeaf04728fcf79c5ceb86c236a7d",
+    "../Prompt_Control _EMNLP_052526.pdf": "5b8481013ae2e56030153513e275dc7c62f38b3f758f366ac8434b8f0ad0f86e",
+    "artifacts/composition_v1_generation_config.json": "4fc93e0af387ba6addfe00e88a1ae0b9ca7a97e73161dd589737d0d9dad7baa9",
+    "models/vllm_client.py": "bc03cd51b476d4062f1fe9a04715104dc8320eea0927e2c23afe98511f57995d",
+    "models/client.py": "b0e8204932556dc4f2ef2fe7eb93b67587876747a8ab5799dd204ea7d8c9ca07"
+  },
+  "verified": {
+    "items": 60,
+    "items_per_stratum": {
+      "safe": 10,
+      "harmful": 10,
+      "ambiguous": 10,
+      "injected_instruction": 10,
+      "mixed_safe_unsafe": 10,
+      "instruction_conflict": 10
+    },
+    "authored_items_approved_unchanged": 40,
+    "training_held_out_split": "none; all items used in direct condition-effect analysis",
+    "conditions_per_item": 67,
+    "planned_item_condition_rows": 4020,
+    "judge_source_hashes_match_manifest": true,
+    "live_generation_started": false,
+    "generator_models": [
+      "meta-llama/Llama-3.1-8B-Instruct",
+      "meta-llama/Llama-3.3-70B-Instruct",
+      "Qwen/Qwen2-7B-Instruct",
+      "Qwen/Qwen2.5-72B-Instruct"
+    ],
+    "planned_item_condition_rows_per_model": 4020,
+    "planned_item_condition_rows_total": 16080,
+    "generation_settings_loaded_from_config": true,
+    "retry_policy": "3 retries after initial attempt; 4 maximum total; attempts persisted across resume; empty responses not cached.",
+    "generation_protocol_file": "artifacts/composition_v1_generation_config.json"
+  }
+}

@@ -21,6 +21,7 @@ class VLLMClient:
         base_url: str = "http://localhost:8000/v1",
         api_key: str = "EMPTY",
         max_retries: int = 3,
+        openai_max_retries: int = None,
         retry_delay: float = 2.0,
         timeout: float = 300.0,
         enable_cache: bool = True
@@ -29,14 +30,22 @@ class VLLMClient:
         self.base_url = base_url
         self.api_key = api_key
         self.max_retries = max_retries
+        self.openai_max_retries = openai_max_retries
         self.retry_delay = retry_delay
         self.timeout = timeout
         self.enable_cache = enable_cache
         self.cache: Dict[str, str] = {}
         self._thread_local = threading.local()
 
-    def _get_cache_key(self, system_prompt: str, user_prompt: str, model: str, temperature: float) -> str:
-        key_content = f"{system_prompt}|{user_prompt}|{model}|{temperature}"
+    def _get_cache_key(
+        self, system_prompt: str, user_prompt: str, model: str,
+        temperature: float, top_p: float, top_k: int,
+        repetition_penalty: float, seed: int, max_tokens: int,
+    ) -> str:
+        key_content = (
+            f"{system_prompt}|{user_prompt}|{model}|{temperature}|{top_p}|"
+            f"{top_k}|{repetition_penalty}|{seed}|{max_tokens}"
+        )
         return hashlib.sha256(key_content.encode('utf-8')).hexdigest()
 
     @property
@@ -48,19 +57,35 @@ class VLLMClient:
                 base_url=self.base_url,
                 api_key=self.api_key,
                 timeout=self.timeout,
-                max_retries=self.max_retries,
+                max_retries=(
+                    self.max_retries if self.openai_max_retries is None
+                    else self.openai_max_retries
+                ),
             )
         return self._thread_local.openai_client
 
-    def generate(self, system_prompt, user_prompt: str, model: str = None, temperature: float = 0.0, max_tokens: int = 512, response_format: Dict[str, Any] = None) -> Tuple[str, Dict[str, Any]]:
+    def generate(
+        self, system_prompt, user_prompt: str, model: str = None,
+        temperature: float = 0.0, max_tokens: int = 512,
+        response_format: Dict[str, Any] = None, top_p: float = 1.0,
+        top_k: int = 0, repetition_penalty: float = 1.05, seed: int = 0,
+    ) -> Tuple[str, Dict[str, Any]]:
         target_model = model or self.model_name
         metadata = {
             "model": target_model,
             "temperature": temperature,
+            "top_p": top_p,
+            "top_k": top_k,
+            "repetition_penalty": repetition_penalty,
+            "seed": seed,
+            "max_tokens": max_tokens,
             "timestamp": time.time(),
         }
 
-        cache_key = self._get_cache_key(str(system_prompt), user_prompt, target_model, temperature)
+        cache_key = self._get_cache_key(
+            str(system_prompt), user_prompt, target_model, temperature, top_p,
+            top_k, repetition_penalty, seed, max_tokens,
+        )
         if self.enable_cache and cache_key in self.cache:
             return self.cache[cache_key], metadata
 
@@ -85,10 +110,13 @@ class VLLMClient:
                     "model": target_model,
                     "messages": messages,
                     "temperature": temperature,
+                    "top_p": top_p,
+                    "seed": seed,
                     "max_tokens": max_tokens,
                 }
-                if extra:
-                    create_kwargs["extra_body"] = extra
+                extra_body = dict(extra)
+                extra_body.update({"top_k": top_k, "repetition_penalty": repetition_penalty})
+                create_kwargs["extra_body"] = extra_body
                 if response_format is not None:
                     create_kwargs["response_format"] = response_format
                 response = self.client.chat.completions.create(**create_kwargs)
@@ -100,7 +128,7 @@ class VLLMClient:
                     metadata["prompt_tokens"] = response.usage.prompt_tokens
                     metadata["completion_tokens"] = response.usage.completion_tokens
 
-                if self.enable_cache:
+                if self.enable_cache and text.strip():
                     self.cache[cache_key] = text
 
                 return text, metadata

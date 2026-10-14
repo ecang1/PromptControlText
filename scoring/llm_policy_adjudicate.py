@@ -101,6 +101,7 @@ def adjudicate_row(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 250,
+    unresolved_label: Optional[str] = None,
 ) -> Tuple[Dict, List[Dict]]:
     """
     Run the adjudication panel for one row.
@@ -151,7 +152,9 @@ def adjudicate_row(
     if final_label is None:
         # All three adjudicators disagree
         needs_human = True
-        if adj_labels:
+        if unresolved_label is not None:
+            final_label = unresolved_label
+        elif adj_labels:
             final_label = adj_labels[0]  # highest-confidence fallback (first call)
         else:
             final_label = "parse_error"
@@ -178,6 +181,12 @@ def adjudicate_row(
         "llm_disagreement_type": "adjudicated",
         "llm_needs_human_audit": needs_human,
     }
+    if final_label == unresolved_label:
+        resolution.update({
+            "llm_confidence": 0.0,
+            "llm_evidence": "",
+            "llm_reason": "Automated adjudication did not reach a majority.",
+        })
 
     return resolution, [combined]
 
@@ -193,6 +202,7 @@ def resolve_first_pass(
     model: str,
     temperature: float = 0.0,
     max_tokens: int = 250,
+    unresolved_label: Optional[str] = None,
 ) -> Tuple[Dict, List[Dict]]:
     """
     Top-level resolver.  Returns (resolution_dict, adjudication_vote_rows).
@@ -229,6 +239,7 @@ def resolve_first_pass(
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
+        unresolved_label=unresolved_label,
     )
     # Fill supplementary fields from first-pass votes
     rep = next(

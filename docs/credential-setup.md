@@ -34,7 +34,7 @@ changes its permissions, run `chmod 600 .env`.
 | `ANTHROPIC_API_KEY` | [Claude API setup](https://platform.claude.com/docs/en/api/overview) | A workspace with API billing and access to the selected generator. |
 | `ANTHROPIC_WORKSPACE_ID` (optional) | [Claude workspace settings](https://platform.claude.com/docs/en/manage-claude/workspaces) | Required when the API key is not scoped to one workspace; the runner sends it as the `anthropic-workspace-id` header. |
 | `GEMINI_API_KEY` | [Google AI Studio key setup](https://ai.google.dev/gemini-api/docs/api-key) | A project with the required billing, quota, and model access. Use this variable consistently rather than also setting `GOOGLE_API_KEY`. |
-| `HF_TOKEN` | [Hugging Face tokens](https://huggingface.co/settings/tokens) | Read access and approved access to [Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct). |
+| `HF_TOKEN` | [Hugging Face tokens](https://huggingface.co/settings/tokens) | Read access and approved access to [Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) and [Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct). Both checkpoints are approved for this account. |
 
 A Runpod website login provides console access, but does not authenticate local
 CLI calls. The Runpod API key enables those calls. A plugin connection, if

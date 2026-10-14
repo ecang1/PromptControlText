@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "experiment": "composition_v1_confirmatory",
+  "reference": "Prompt_Control _EMNLP_052526.pdf, Supplement E.9",
+  "models": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "meta-llama/Llama-3.3-70B-Instruct",
+    "Qwen/Qwen2-7B-Instruct",
+    "Qwen/Qwen2.5-72B-Instruct"
+  ],
+  "vllm_version": "0.19.0",
+  "hardware_reference": "NVIDIA A100 80GB SXM",
+  "precision": "bfloat16",
+  "quantization": null,
+  "tensor_parallel_size": {
+    "meta-llama/Llama-3.1-8B-Instruct": 1,
+    "Qwen/Qwen2-7B-Instruct": 1,
+    "meta-llama/Llama-3.3-70B-Instruct": 4,
+    "Qwen/Qwen2.5-72B-Instruct": 4
+  },
+  "chat_template": "Use each checkpoint's official tokenizer chat template through vLLM.",
+  "sampling": {
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "top_k": 0,
+    "repetition_penalty": 1.05,
+    "max_tokens": 512,
+    "seed": 0
+  },
+  "max_concurrent_sequences": 512,
+  "request_timeout_seconds": 300,
+  "retry_policy": {
+    "max_retries": 3,
+    "max_attempts_total": 4,
+    "retry_on": ["request_error", "empty_response"],
+    "backoff_seconds": [2, 4, 6],
+    "after_exhaustion": "Retain the failed or empty case in the generation CSV with its attempt count and error; do not silently exclude it or retry past four total attempts."
+  },
+  "endpoint_and_compute_provisioning": "Deferred until API access and compute are arranged; any deviation from the paper's reference hardware/runtime must be recorded before live generation."
+}
